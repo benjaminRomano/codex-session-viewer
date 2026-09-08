@@ -609,3 +609,8 @@ The report contract favors a short diagnosis, actionable P0/P1/P2 bullets, and a
 ordered evidence timeline. It calls out semantic failures, background lifetimes,
 overlap, and unmeasured savings beside the affected claims. Private trial reports
 and real session inputs are not part of the package.
+
+Publication verification: the combined check passes all 59 Rust, 64 frontend,
+and 10 helper tests plus lint, format, type, and unused-code gates. Independent
+review found no actionable issues, and the changed-file secret scan was clean.
+Prior production/WASM/Chrome evidence above covers the unchanged engine patch.

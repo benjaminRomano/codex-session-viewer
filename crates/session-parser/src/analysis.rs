@@ -97,7 +97,21 @@ fn operation_targets<'a>(
     let mut targets: Vec<_> = operation
         .target_ids
         .iter()
-        .filter_map(|id| by_id.get(id.as_str()).copied())
+        .filter_map(|id| {
+            by_id.get(id.as_str()).copied().or_else(|| {
+                if id.is_empty() || id.starts_with('/') || crate::is_thread_id(id) {
+                    return None;
+                }
+                // Task names are relative to the sender, never a global basename.
+                // Older root records omit their path; missing child paths are ambiguous.
+                let path = parent
+                    .metadata
+                    .agent_path
+                    .as_deref()
+                    .or_else(|| parent.metadata.parent_id.is_none().then_some("/root"))?;
+                by_id.get(format!("{path}/{id}").as_str()).copied()
+            })
+        })
         .collect();
     if operation.kind == "wait"
         && operation.target_ids.is_empty()
@@ -203,7 +217,14 @@ pub fn build_flows(sessions: &[ParsedSession], start: f64, end: f64) -> Vec<Flow
                     target
                         .spans
                         .iter()
-                        .filter(|span| span.track != "turns" && span.start_time >= op.timestamp)
+                        .filter(|span| {
+                            span.start_time >= op.timestamp
+                                && if op.kind == "spawn" {
+                                    span.track == "turns"
+                                } else {
+                                    span.track != "turns"
+                                }
+                        })
                         .min_by(|a, b| a.start_time.total_cmp(&b.start_time))
                 };
                 let Some(endpoint) = endpoint else {

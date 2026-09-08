@@ -135,3 +135,10 @@ in the repository’s Actions tab. Local results below are recorded separately.
 Release status is tracked by the PR merge and the [gated main publication workflow](https://github.com/benjaminRomano/codex-session-viewer/actions/workflows/ci.yml), which verifies deployed asset bytes before reporting success.
 
 - [x] Collapse the dock whenever selection clears; reopen details on span selection and preserve access to the other dock tabs.
+
+## Agent flow targets
+
+- [x] Reproduce missing main-agent send links using the supplied session ID; keep real records local.
+- [x] Resolve relative task names in the sender's scope and add synthetic regression coverage, including duplicate names in nested agents.
+- [x] Verify native/WASM parity, Chrome flow rendering, quality gates and independent review; publish through the reviewed flow-fix branch.
+- [x] Route spawn arrows to the first new child turn, excluding inherited history; keep sends on received messages. Add regression coverage.

@@ -135,3 +135,9 @@ in the repository’s Actions tab. Local results below are recorded separately.
 Release status is tracked by the PR merge and the [gated main publication workflow](https://github.com/benjaminRomano/codex-session-viewer/actions/workflows/ci.yml), which verifies deployed asset bytes before reporting success.
 
 - [x] Collapse the dock whenever selection clears; reopen details on span selection and preserve access to the other dock tabs.
+
+## Tooling refresh
+
+- [x] Replace ESLint and Prettier with native, type-aware Oxlint and oxfmt while preserving existing rule coverage, formatting options, and generated/private-data ignores.
+- [x] Upgrade native TypeScript, frontend build/test tooling, WASM bindings/CLI, and pinned CI actions to current stable releases.
+- [ ] Validate static/unit/native checks, production build, native/WASM parity, and external Chrome scenarios before merging the tooling PR.

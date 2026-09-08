@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "^24.15.0 || >=26.0.0",
+    "npm": ">=12.0.2"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -18,10 +19,10 @@
     "bench:browser": "node scripts/bench-browser.mjs",
     "bench:corpus": "bash scripts/rust-command.sh run --release -p session-parser --bin benchmark --",
     "check": "npm run check:ts && npm run check:rust",
-    "lint": "eslint . --max-warnings=0",
-    "lint:fix": "eslint . --fix --max-warnings=0",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
+    "lint": "oxlint . --deny-warnings",
+    "lint:fix": "oxlint . --fix --deny-warnings",
+    "format": "oxfmt . --write",
+    "format:check": "oxfmt . --check",
     "check:unused": "knip",
     "lint:rust": "bash scripts/rust-command.sh clippy --locked --workspace --all-targets -- -D warnings",
     "format:rust": "bash scripts/rust-command.sh fmt --all",
@@ -39,21 +40,18 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
-    "@playwright/test": "1.58.2",
-    "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "eslint": "10.10.0",
-    "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "17.12.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
     "knip": "6.34.0",
-    "prettier": "3.9.6",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.70.0",
+    "oxfmt": "0.67.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2",
     "vite": "8.2.2",
-    "vitest": "4.1.0"
-  }
+    "vitest": "5.0.0"
+  },
+  "packageManager": "npm@12.0.2"
 }

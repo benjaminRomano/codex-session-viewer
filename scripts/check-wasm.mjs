@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   initSync,
   parse_session,
@@ -35,7 +36,7 @@ for (const args of [
   ['--analyze', 'root', '1', '0'],
 ]) {
   const result = spawnSync(
-    new URL('../target/release/session-parser', import.meta.url).pathname,
+    fileURLToPath(new URL('../target/release/session-parser', import.meta.url)),
     args,
     {
       input: '[]',
@@ -49,7 +50,7 @@ for (const args of [
 }
 const native = (input, args = []) => {
   const result = spawnSync(
-    new URL('../target/release/session-parser', import.meta.url).pathname,
+    fileURLToPath(new URL('../target/release/session-parser', import.meta.url)),
     args,
     { input, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
   );

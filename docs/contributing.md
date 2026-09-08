@@ -87,3 +87,44 @@ environment. The packager rejects unexpected files and validates synthetic demos
 the live check compares every served file to the tested artifact. See
 [deployment.md](deployment.md) for setup and recovery. Local checks do not establish
 that hosted CI or deployment ran; record that distinction in handoff notes.
+
+## Session bug reports and regressions
+
+Open **Session info** beside the sidebar agent count. Copy the session ID; choose
+a child from the dialog's Session selector when the issue is in that agent.
+Include the affected turn/span, observed and expected timing, parser version,
+and relevant diagnostics. The source path in the dialog identifies the local
+rollout. An ID identifies the file; it does not grant another person access to it.
+
+For an authorized local investigation, locate only that rollout in `sessions/`
+or `archived_sessions/`, or match its ID in `session_index.jsonl`. Do not search
+credentials or unrelated Codex files. Use the native `session-parser` CLI to
+inspect normalized spans and `--details` with physical source/output lines. Keep
+real rollouts and derived JSON in ignored local output directories. Never attach
+the whole rollout or paste personal prompts/tool output into a public issue or PR.
+
+1. Compare the reported span with its lifecycle records, timestamps, turn IDs
+   and call IDs. Check missing completion events, late results, copied history
+   and intervening metadata before assuming a duration is measured model work.
+2. Reduce the cause to synthetic records in `crates/session-parser/tests`.
+   Preserve event order, missing events and relative time gaps; replace IDs,
+   prompts, paths and output with invented values. Confirm the test fails on the
+   old parser for the intended reason before changing the engine.
+3. Fix interpretation in Rust. Assert the correct turn/span boundaries and
+   preserve explicit overlaps and legitimate long operations; do not hide an
+   outlier with a maximum-duration cutoff in React. Add native/WASM contract
+   coverage in `scripts/check-wasm.mjs` for the affected browser boundary.
+4. Reparse the authorized source locally and compare the relevant aggregate
+   durations. Record the cause, false starts and content-free results in the
+   implementation notes. Bump `PARSER_VERSION` when parser semantics change.
+5. Run `npm run check`, the production build, native/WASM parity and relevant
+   external Chrome scenarios. Review the diff and publication file set before
+   opening the PR; merge only after CI passes and verify the main deployment.
+
+The missing-completion regression demonstrates this workflow: an unfinished turn
+followed by a later visit previously extended to file end. The engine now bounds
+it by its own last recorded activity, while a late explicit completion can still
+prove overlap with a newer turn. Compaction has two distinct records: an operation
+with explicit elapsed time and an instantaneous history-commit marker. Large
+opaque replacement history is not displayable detail content and must not create
+empty pagination.

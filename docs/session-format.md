@@ -150,3 +150,18 @@ Trace excerpts are not the full-detail store. Every recorded span carries 1-base
 Rust builds communication flows, span aggregates and the reconstructed blocking chain. A sweep across operation boundaries partitions time without double-counting nested wrappers: concrete tools take precedence over code wrappers, which take precedence over inference gaps. A wait can enter a child's path only when a completed child turn is recorded inside the wait. Running children, unknown targets and cycles leave the wait in place. The latest observed completion among wait targets is selected; unknown scheduling dependencies are not asserted as exact causal facts. Adjacent segments from the same operation are coalesced and repetition statistics count an operation once even when nesting splits its contribution.
 
 The analysis API is `analyze_sessions(json, rootId, startMs, endMs)` and returns `{flows, path, statistics}`. `path` contains ordered clipped segments, total time, internal observed/uncertain totals, aggregated path operations and suggestions. `aggregate_spans(json)` supports selection summaries. Browser components display these normalized results rather than deriving a second engine model.
+
+### Missing turn completions and compaction details
+
+An open turn retains the time of its own last activity record. Session settings
+and unrelated later turns do not extend it. At EOF an unfinished superseded turn
+is `incomplete`; the currently active unfinished turn remains `running`. Neither
+is extended to the file's last timestamp. An explicit late completion belongs to
+its named turn and does not clear a different active turn. Explicit overlapping
+turns and operation intervals remain intact. Diagnostics report missing terminal
+records.
+
+`ContextCompaction` item timestamps define its recorded elapsed duration. A
+`compacted` record instead marks the instantaneous history replacement. Its opaque
+replacement history is not rendered as prompt/output. Detail paging requires
+displayable content, so large ignored fields cannot offer empty pages.

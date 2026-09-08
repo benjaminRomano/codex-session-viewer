@@ -584,3 +584,96 @@ fn code_cell_wait_is_not_an_agent_operation() {
     assert_eq!(parsed["spans"][0]["track"], "code");
     assert!(parsed["agentOperations"].as_array().unwrap().is_empty());
 }
+
+#[test]
+fn missing_completion_stops_at_own_activity_not_later_turns_or_settings() {
+    let input = meta()
+        + &start()
+        + &call(2, "command", "exec_command", json!({"cmd":"true"}))
+        + &output(5, "command", json!({"exit_code":0}))
+        + &record(6, "event_msg", json!({"type":"token_count"}))
+        + &record(20, "event_msg", json!({"type":"thread_settings_applied"}))
+        + &record(21, "event_msg", json!({"type":"task_started","turn_id":"next"}))
+        + &record(22, "event_msg", json!({"type":"task_complete","turn_id":"next"}))
+        + &json!({"timestamp":"2026-09-08T00:00:00Z","type":"event_msg","payload":{"type":"thread_settings_applied"}}).to_string();
+    let parsed: Value = serde_json::from_str(&parse_session(&input)).unwrap();
+    let first = &parsed["turns"][0];
+    assert_eq!(
+        first["endTime"].as_f64().unwrap() - first["startTime"].as_f64().unwrap(),
+        5000.0
+    );
+    assert_eq!(first["status"], "incomplete");
+    assert!(parsed["spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|span| span["turnId"] == "turn-1")
+        .all(|span| span["endTime"].as_f64().unwrap() <= first["endTime"].as_f64().unwrap()));
+    assert_eq!(
+        parsed["metadata"],
+        serde_json::from_str::<Value>(&scan_metadata(&input)).unwrap()
+    );
+}
+
+#[test]
+fn late_completion_preserves_the_new_active_turn_and_explicit_overlap() {
+    let input = meta()
+        + &start()
+        + &record(
+            2,
+            "event_msg",
+            json!({"type":"task_started","turn_id":"next"}),
+        )
+        + &record(
+            3,
+            "event_msg",
+            json!({"type":"task_complete","turn_id":"turn-1"}),
+        )
+        + &call(4, "next-call", "exec_command", json!({"cmd":"true"}))
+        + &output(5, "next-call", json!({"exit_code":0}))
+        + &record(
+            6,
+            "event_msg",
+            json!({"type":"task_complete","turn_id":"next"}),
+        );
+    let parsed: Value = serde_json::from_str(&parse_session(&input)).unwrap();
+    let call = parsed["spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["callId"] == "next-call")
+        .unwrap();
+    assert_eq!(call["turnId"], "next");
+    assert!(
+        parsed["turns"][0]["endTime"].as_f64().unwrap()
+            > parsed["turns"][1]["startTime"].as_f64().unwrap()
+    );
+    assert_eq!(parsed["turns"][0]["status"], "complete");
+}
+
+#[test]
+fn compaction_uses_recorded_elapsed_time_and_keeps_the_commit_marker_instant() {
+    let input = meta()
+        + &start()
+        + &record(
+            5,
+            "event_msg",
+            json!({"type":"item_completed", "turn_id":"turn-1", "started_at_ms":1788739202000u64, "completed_at_ms":1788739372000u64, "item":{"type":"ContextCompaction","id":"compact"}}),
+        )
+        + &record(6, "compacted", json!({"replacement_history":[]}));
+    let parsed: Value = serde_json::from_str(&parse_session(&input)).unwrap();
+    let spans = parsed["spans"].as_array().unwrap();
+    let operation = spans
+        .iter()
+        .find(|span| span["callId"] == "compact")
+        .unwrap();
+    assert_eq!(
+        operation["endTime"].as_f64().unwrap() - operation["startTime"].as_f64().unwrap(),
+        170_000.0
+    );
+    let marker = spans
+        .iter()
+        .find(|span| span["name"] == "Context compacted")
+        .unwrap();
+    assert_eq!(marker["startTime"], marker["endTime"]);
+}

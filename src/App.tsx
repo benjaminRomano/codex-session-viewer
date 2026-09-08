@@ -151,6 +151,13 @@ export default function App() {
   const [highlightedId, setHighlightedId] = useState<string>();
   const [spanFocus, setSpanFocus] = useState<{ spanId: string; nonce: number }>();
   const [critical, setCritical] = useState(false);
+  const toggleCritical = useCallback(() => {
+    setCritical(!critical);
+    if (!critical) {
+      setTab('critical');
+      setDockCollapsed(false);
+    }
+  }, [critical]);
   const [modal, setModal] = useState(false);
   const [saved, setSaved] = useState<FileSystemDirectoryHandle>();
   const [query, setQuery] = useState('');
@@ -170,7 +177,7 @@ export default function App() {
     }
   });
   const [dockHeight, setDockHeight] = useState(240);
-  const [dockCollapsed, setDockCollapsed] = useState(false);
+  const [dockCollapsed, setDockCollapsed] = useState(true);
   const demoCache = useRef<ParsedSession[]>([]);
   const demoFiles = useRef(new Map<string, File>());
   const loadDetail = useCallback<LoadDetail>(
@@ -328,10 +335,14 @@ export default function App() {
   } = useEngineAnalysis(visibleSessions, focusId || rootId, range);
   const detail = selected.find((s) => s.id === detailId) ?? selected[0];
 
+  function selectSpans(ids: string[]) {
+    setSelectedIds(ids);
+    setDockCollapsed(ids.length === 0);
+  }
   function focusSession(id: string) {
     setFocusId(id);
     setTurnId('');
-    setSelectedIds([]);
+    selectSpans([]);
     setMeasure(null);
     setHighlightedId(undefined);
     setSpanFocus(undefined);
@@ -342,7 +353,7 @@ export default function App() {
     setRootId('');
     setFocusId('');
     setSessions([]);
-    setSelectedIds([]);
+    selectSpans([]);
     setTurnId('');
     setGraph(undefined);
     setBusy(false);
@@ -353,9 +364,8 @@ export default function App() {
     setTurnId(turn?.id || '');
     setMeasure(null);
     setTab('selection');
-    setDockCollapsed(false);
     const span = focused?.spans.find((s) => s.track === 'turns' && s.turnId === turn?.id);
-    setSelectedIds(span ? [span.id] : []);
+    selectSpans(span ? [span.id] : []);
   }
   function boundedDockHeight(height: number) {
     return Math.max(100, Math.min(window.innerHeight - 180, height));
@@ -513,10 +523,9 @@ export default function App() {
   }
   const scanning = progress && progress.phase !== 'complete' && !scanAbort.current?.signal.aborted;
   const focusSpan = (span: Span) => {
-    setSelectedIds([span.id]);
+    selectSpans([span.id]);
     setDetailId(span.id);
     setSpanFocus((previous) => ({ spanId: span.id, nonce: (previous?.nonce ?? 0) + 1 }));
-    setDockCollapsed(false);
   };
   const criticalDetail =
     detail && path.segments.some((segment) => segment.span.id === detail.id) ? detail : undefined;
@@ -659,10 +668,9 @@ export default function App() {
                   )}
                   <button
                     className={critical ? 'active' : ''}
-                    onClick={() => {
-                      setCritical(!critical);
-                      if (!critical) setTab('critical');
-                    }}
+                    aria-pressed={critical}
+                    title="Toggle critical path (C)"
+                    onClick={toggleCritical}
                   >
                     <span className="critical-line" />
                     Critical path
@@ -670,15 +678,15 @@ export default function App() {
                 </div>
               </div>
               <Timeline
+                onToggleCritical={toggleCritical}
                 highlightedId={highlightedId}
                 focusRequest={spanFocus}
                 sessions={visibleSessions}
                 range={range}
                 selectedIds={selectedIds}
                 onSelectionChange={(ids) => {
-                  setSelectedIds(ids);
+                  selectSpans(ids);
                   setTab('selection');
-                  setDockCollapsed(false);
                 }}
                 flows={flows}
                 onInspectSession={focusSession}
@@ -716,19 +724,28 @@ export default function App() {
                 <div className="details-tabs">
                   <button
                     className={tab === 'selection' ? 'active' : ''}
-                    onClick={() => setTab('selection')}
+                    onClick={() => {
+                      setTab('selection');
+                      setDockCollapsed(selectedIds.length === 0);
+                    }}
                   >
                     Selection{selected.length ? ` (${selected.length})` : ''}
                   </button>
                   <button
                     className={tab === 'critical' ? 'active' : ''}
-                    onClick={() => setTab('critical')}
+                    onClick={() => {
+                      setTab('critical');
+                      setDockCollapsed(false);
+                    }}
                   >
                     Critical path
                   </button>
                   <button
                     className={tab === 'statistics' ? 'active' : ''}
-                    onClick={() => setTab('statistics')}
+                    onClick={() => {
+                      setTab('statistics');
+                      setDockCollapsed(false);
+                    }}
                   >
                     Statistics
                   </button>
@@ -979,6 +996,8 @@ export default function App() {
             <dd>Pan timeline</dd>
             <dt>Shift + click</dt>
             <dd>Add / remove selection</dd>
+            <dt>C</dt>
+            <dd>Toggle critical path</dd>
             <dt>M</dt>
             <dd>Measure selection</dd>
             <dt>&gt;</dt>

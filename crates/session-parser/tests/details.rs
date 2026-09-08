@@ -361,3 +361,51 @@ fn genuine_xml_request_is_preserved_after_known_context() {
     assert_eq!(parsed["turns"][0]["sourceLine"], 4);
     assert_eq!(load(&input, json!({"sourceLine":4}))["prompt"], request);
 }
+
+#[test]
+fn opaque_compaction_history_does_not_offer_empty_pages() {
+    let input = serde_json::json!({"timestamp":"2026-09-07T00:00:00Z","type":"compacted","payload":{"replacement_history":[{"type":"message","content":"x".repeat(150_000)}]}}).to_string();
+    let mut parser = DetailParser::new(r#"{"sourceLine":1,"pageSize":65536}"#).unwrap();
+    parser.push(&input);
+    let result: serde_json::Value = serde_json::from_str(&parser.finish()).unwrap();
+    assert_eq!(result["hasMore"], false);
+    assert!(result.get("nextOffset").is_none());
+    assert!(result.get("output").is_none());
+}
+
+#[test]
+fn ignored_large_fields_do_not_create_duplicate_detail_pages() {
+    for payload in [
+        json!({"type":"web_search_end","query":"synthetic","action":{"type":"search"},"results":["done"],"ignored":"x".repeat(150_000)}),
+        json!({"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"true\"}","ignored":"x".repeat(150_000)}),
+        json!({"type":"message","role":"assistant","content":[{"type":"output_text","text":"done","ignored":"x".repeat(150_000)}]}),
+    ] {
+        let input = json!({"type":"response_item","payload":payload}).to_string() + "\n";
+        let result = load(&input, json!({"sourceLine":1,"pageSize":65536}));
+        assert_eq!(result["hasMore"], false);
+        assert!(result.get("nextOffset").is_none());
+    }
+}
+
+#[test]
+fn displayed_web_search_query_reconstructs_across_pages() {
+    let query = "search 🦀 ".repeat(15000);
+    let input = json!({"type":"event_msg","payload":{"type":"web_search_end","query":query,"action":{"type":"search"},"results":["done"]}}).to_string();
+    let mut offset = 0;
+    let mut reconstructed = String::new();
+    loop {
+        let result = load(
+            &input,
+            json!({"sourceLine":1,"pageSize":65536,"offset":offset}),
+        );
+        let args: Value = serde_json::from_str(result["args"].as_str().unwrap()).unwrap();
+        reconstructed.push_str(args["query"].as_str().unwrap());
+        if result["hasMore"] == false {
+            break;
+        }
+        offset = result["nextOffset"].as_u64().unwrap();
+        assert!(offset < 300000);
+    }
+    assert!(offset > 0);
+    assert_eq!(reconstructed, query);
+}

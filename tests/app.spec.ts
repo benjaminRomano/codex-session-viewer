@@ -322,3 +322,56 @@ test('large structured output stays valid on each displayed detail page', async 
     await rm(folder, { recursive: true, force: true });
   }
 });
+
+test('session info reports identities and diagnostics; C toggles only outside dialogs and inputs', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  // Verify the copy payload without reading or changing the host clipboard.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', {
+      value: async (text: string) => {
+        (window as unknown as { copiedSessionId: string }).copiedSessionId = text;
+      },
+    });
+  });
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles(directory);
+  await page.getByRole('button', { name: /^Fixture root / }).click();
+  await expect(page.locator('.scope-toolbar')).toContainText('4 agents');
+  await expect(page.locator('.sidebar-footer')).toHaveCount(0);
+  const critical = page
+    .locator('.trace-info')
+    .getByRole('button', { name: 'Critical path', exact: true, includeHidden: true });
+  await expect(critical).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Session info', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Session info' });
+  await expect(dialog.getByLabel('Session ID', { exact: true })).toHaveValue(rootId);
+  await expect(dialog).toContainText('session-parser-v1-stream-9');
+  await expect(dialog).toContainText('sessions/demo-root.jsonl');
+  await dialog.getByRole('button', { name: 'Copy session ID' }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Session ID copied');
+  expect(
+    await page.evaluate(() => (window as unknown as { copiedSessionId: string }).copiedSessionId),
+  ).toBe(rootId);
+  await page.keyboard.press('c');
+  await expect(critical).toHaveAttribute('aria-pressed', 'false');
+  await dialog
+    .getByRole('combobox', { name: 'Session', exact: true })
+    .selectOption('00000000-0000-4000-8000-000000000002');
+  await expect(dialog.getByLabel('Session ID', { exact: true })).toHaveValue(
+    '00000000-0000-4000-8000-000000000002',
+  );
+  await expect(dialog).toContainText('Archived');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await page.keyboard.press('c');
+  await expect(critical).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.critical-content')).toBeVisible();
+  await page.keyboard.press('c');
+  await expect(critical).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Control+c');
+  await expect(critical).toHaveAttribute('aria-pressed', 'false');
+  expect(errors).toEqual([]);
+});

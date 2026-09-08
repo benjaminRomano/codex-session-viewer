@@ -1,5 +1,6 @@
 export const TRACKS = [
   'turns',
+  'messages',
   'inference',
   'shell',
   'files',
@@ -12,7 +13,6 @@ export const TRACKS = [
   'web',
   'approval',
   'context',
-  'messages',
   'system',
 ] as const;
 export type TrackKind = (typeof TRACKS)[number];
@@ -25,7 +25,7 @@ export const TRACK_LABELS: Record<TrackKind, string> = {
   code: 'Code mode',
   agent_dispatch: 'Agent dispatch',
   agent_wait: 'Agent wait',
-  agent_messages: 'Agent messages',
+  agent_messages: 'Agent communication',
   tools: 'Tools / MCP',
   web: 'Web / media',
   approval: 'Approvals / input',
@@ -50,6 +50,7 @@ export interface SessionMetadata {
   malformedLines: number;
   oversizedLines?: number;
   oversizedBytes?: number;
+  elidedStrings?: number;
 }
 export interface SessionEntry extends SessionMetadata {
   path: string;

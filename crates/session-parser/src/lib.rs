@@ -515,13 +515,13 @@ pub struct Engine {
     eliding: bool,
     line_number: usize,
     capture_lines: Option<BTreeSet<usize>>,
-    captured: Vec<Value>,
+    captured: Vec<details::CapturedRecord>,
     capture_mode: bool,
     string_limit: u64,
     string_offset: u64,
     string_start: usize,
     paged_string: bool,
-    max_string_bytes: u64,
+    paged_offsets: BTreeSet<usize>,
     surrogate_keep: bool,
     capture_call: Option<String>,
 }
@@ -568,7 +568,7 @@ impl Engine {
             string_offset: 0,
             string_start: 0,
             paged_string: false,
-            max_string_bytes: 0,
+            paged_offsets: BTreeSet::new(),
             surrogate_keep: false,
             capture_call: None,
         }
@@ -620,6 +620,7 @@ impl Engine {
                 self.string_bytes = 0;
                 self.eliding = false;
                 self.paged_string = false;
+                self.paged_offsets.clear();
             }
         }
     }
@@ -763,7 +764,11 @@ impl Engine {
                     self.pending_line.truncate(self.string_start);
                     self.paged_string = true;
                 }
-                self.max_string_bytes = self.max_string_bytes.max(self.string_bytes);
+                if self.capture_mode
+                    && self.string_bytes > self.string_offset.saturating_add(self.string_limit)
+                {
+                    self.paged_offsets.insert(self.string_start - 1);
+                }
                 if self.eliding && !self.capture_mode {
                     self.pending_line.push_str("… [truncated]");
                 }
@@ -820,6 +825,7 @@ impl Engine {
     }
 
     fn line(&mut self, line: &str) {
+        let original_line = line;
         let line = line.trim().trim_start_matches('\u{feff}');
         if line.is_empty() {
             return;
@@ -831,7 +837,12 @@ impl Engine {
                     if self.capture_call.as_ref().is_none_or(|id| {
                         s(payload, "call_id") == id || s(&payload["item"], "id") == id
                     }) {
-                        self.captured.push(value);
+                        self.captured.push(details::CapturedRecord::new(
+                            value,
+                            line,
+                            original_line.as_ptr() as usize,
+                            &self.paged_offsets,
+                        ));
                     }
                 }
                 Err(_) => self.parsed.metadata.malformed_lines += 1,
@@ -926,6 +937,24 @@ impl Engine {
                 self.instant("context", "Context compacted", time, None);
             }
             _ => (),
+        }
+        // A file can contain later turns long after an interrupted turn lost
+        // its completion event. Keep each open turn bounded by its own activity,
+        // excluding settings/metadata written when the session is reopened.
+        if matches!(envelope.kind, "response_item" | "inter_agent_communication")
+            || (envelope.kind == "event_msg" && s(&v, "type") != "thread_settings_applied")
+        {
+            let index = if s(&v, "turn_id").is_empty() {
+                self.active_turn
+            } else {
+                self.turns_by_id.get(s(&v, "turn_id")).copied()
+            };
+            if let Some(index) = index {
+                let turn = &mut self.parsed.turns[index];
+                if turn.status == "running" {
+                    turn.end_time = turn.end_time.max(event_time(&v, "completed_at_ms", time));
+                }
+            }
         }
     }
 
@@ -1374,6 +1403,7 @@ impl Engine {
                 self.ensure_turn(s(v, "turn_id"), time);
             }
             "task_complete" | "turn_complete" | "turn_aborted" => {
+                let previous_active = self.active_turn;
                 let index = if !s(v, "turn_id").is_empty() {
                     self.ensure_turn(s(v, "turn_id"), time)
                 } else if let Some(i) = self.active_turn {
@@ -1388,7 +1418,7 @@ impl Engine {
                     "complete"
                 }
                 .into();
-                self.active_turn = None;
+                self.active_turn = previous_active.filter(|&active| active != index);
             }
             "user_message" => {
                 self.ensure_turn("", time);
@@ -1783,10 +1813,19 @@ impl Engine {
                 metadata.title = clip(&title, 160);
             }
         }
-        for turn in &mut self.parsed.turns {
+        let mut unclosed = 0;
+        for (index, turn) in self.parsed.turns.iter_mut().enumerate() {
             if turn.status == "running" {
-                turn.end_time = self.parsed.metadata.end_time.max(turn.start_time);
+                unclosed += 1;
+                if Some(index) != self.active_turn {
+                    turn.status = "incomplete".into();
+                }
             }
+        }
+        if unclosed > 0 {
+            self.parsed.warnings.push(format!(
+                "{unclosed} turns have no completion record; their durations stop at their last recorded activity."
+            ));
         }
         if self.parsed.metadata.malformed_lines > 0 {
             self.parsed.warnings.push(format!(

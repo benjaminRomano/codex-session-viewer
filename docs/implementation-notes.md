@@ -436,3 +436,37 @@ ordering in 36.3 s. All original anchor, overlap, mounted-row, full-payload and
 console-error assertions remain. Strict frontend quality checks and all 61 tests
 pass. Independent focused review found no issues; Linux CI remains the final
 automatic publication check.
+
+The next automatic run (34181797562 on ee62893) passed both Rust platforms and
+all browser gates, including the strengthened 4,000-entry regression. The
+project-scoped GitHub credential successfully uploaded and aliased the static
+artifact. The immediate public check then rejected different index.html bytes.
+A subsequent read of the production origin matched all 10 files (871,230 bytes),
+including both HTML entry paths, security/cache/MIME checks and missing-WASM 404.
+This isolated a brief production-alias propagation interval rather than a build
+mutation or credential failure. The checker must allow bounded HTML convergence
+before asking for new hashed assets, while keeping incorrect headers, redirects
+and persistent byte mismatches as failures.
+
+Retrying only the failed deployment job in run 34181797562 succeeded, reusing the
+same verified artifact and project-scoped environment credential. Both Rust jobs,
+the complete browser job and the deploy job are green. A fresh external Chrome
+load of production parsed the synthetic trace and log; focusing a log operation
+retained all four agents, 73 spans and the Log tab. The bounded readiness change
+is a follow-up to prevent this observed transition from causing false failures.
+
+The final checker waits for both `/` and `/index.html` to match the tested HTML
+before requesting hashed assets. Retry backoff starts at 250 ms and caps at two
+seconds; readiness has a 40-second cap within the existing 120-second overall
+deadline. Only index content mismatches and transient transport/status failures
+can retry. Header, MIME, cache, redirect and authorization errors remain fatal;
+asset bytes still have to match exactly. The complete strict inventory check
+runs after readiness, including both entry paths and a missing-WASM 404.
+
+Three focused regressions cover old entry routes converging before any asset
+request, permanently wrong HTML timing out, and stale HTML with invalid headers
+failing immediately. Existing rejection cases assert a single request. All 64
+frontend/deployment tests, TypeScript, ESLint, Prettier and Knip pass. The final
+checker also verifies all 10 live files. A fresh 85-file publication snapshot
+passed Gitleaks. Independent review found no code/security/bounds/cancellation
+issues; its sole bookkeeping note is resolved by closing the TASKS entry.

@@ -13,6 +13,9 @@ const MIME = {
   '.wasm': ['application/wasm'],
 };
 class VerificationError extends Error {}
+class ContentMismatchError extends VerificationError {}
+class TransientVerificationError extends VerificationError {}
+const TRANSIENT_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
 function requireThat(condition, message) {
   if (!condition) throw new VerificationError(message);
 }
@@ -104,11 +107,14 @@ async function verify(url, file, signal, missing = false) {
       const expectedStatus = missing ? 404 : 200;
       if (response.status !== expectedStatus) {
         await response.body?.cancel();
-        if (attempt < 2 && [404, 429, 500, 502, 503, 504].includes(response.status)) {
+        if (attempt < 2 && TRANSIENT_STATUSES.has(response.status)) {
           await delay(attempt ? 750 : 250, undefined, { signal });
           continue;
         }
-        throw new VerificationError(
+        const ErrorType = TRANSIENT_STATUSES.has(response.status)
+          ? TransientVerificationError
+          : VerificationError;
+        throw new ErrorType(
           `${file.relative}: expected HTTP ${expectedStatus}, received ${response.status}`,
         );
       }
@@ -127,13 +133,12 @@ async function verify(url, file, signal, missing = false) {
       if (response.body)
         for await (const chunk of response.body) {
           bytes += chunk.length;
-          requireThat(bytes <= file.bytes, `${file.relative}: deployed bytes differ`);
+          if (bytes > file.bytes)
+            throw new ContentMismatchError(`${file.relative}: deployed bytes differ`);
           hash.update(chunk);
         }
-      requireThat(
-        bytes === file.bytes && hash.digest('hex') === file.hash,
-        `${file.relative}: deployed bytes differ`,
-      );
+      if (bytes !== file.bytes || hash.digest('hex') !== file.hash)
+        throw new ContentMismatchError(`${file.relative}: deployed bytes differ`);
       return;
     } catch (error) {
       if (signal.aborted)
@@ -142,6 +147,40 @@ async function verify(url, file, signal, missing = false) {
         );
       if (error instanceof VerificationError || attempt === 2) throw error;
       await delay(attempt ? 750 : 250, undefined, { signal });
+    }
+  }
+}
+
+async function waitForIndex(base, index, signal) {
+  const readiness = AbortSignal.any([signal, AbortSignal.timeout(40_000)]);
+  let attempt = 0;
+  while (true) {
+    try {
+      // The production alias can briefly retain the prior document. Wait for
+      // both entry routes before requesting assets named only by the new build.
+      await verify(base, index, readiness);
+      await verify(new URL('index.html', base), index, readiness);
+      return;
+    } catch (error) {
+      if (signal.aborted)
+        throw new VerificationError('Deployment verification exceeded its 120-second deadline');
+      if (readiness.aborted)
+        throw new VerificationError('Production index did not become ready within 40 seconds');
+      if (
+        error instanceof VerificationError &&
+        !(error instanceof ContentMismatchError) &&
+        !(error instanceof TransientVerificationError)
+      )
+        throw error;
+      try {
+        await delay(Math.min(250 * 2 ** attempt++, 2_000), undefined, { signal: readiness });
+      } catch {
+        throw new VerificationError(
+          signal.aborted
+            ? 'Deployment verification exceeded its 120-second deadline'
+            : 'Production index did not become ready within 40 seconds',
+        );
+      }
     }
   }
 }
@@ -163,6 +202,7 @@ export async function checkDeployment(url, staticDir) {
   requireThat(index, 'The staged static directory must contain index.html');
   const abort = new AbortController();
   const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(120_000)]);
+  await waitForIndex(base, index, signal);
   const requests = [
     ...files.map((file) => ({
       file,

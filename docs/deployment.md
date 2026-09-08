@@ -24,8 +24,11 @@ that isolated package with pinned Vercel CLI 59.11.7 and `--prebuilt --prod`.
 The repository, reports and local data are never sent as deployment source.
 
 `scripts/check-deployment.mjs` then reads the public production origin without
-authentication. It compares every file with the verified artifact and checks
-MIME types, security/cache headers and a missing-WASM 404. A failed check fails
+authentication. Before fetching hashed assets, it allows a bounded interval for
+both HTML entry paths to serve the new build after the production alias changes.
+It then compares every file with the verified artifact and checks MIME types,
+security/cache headers and a missing-WASM 404. Incorrect headers, redirects and
+persistent byte mismatches remain failures. A failed check fails
 the deployment job; it does not silently roll back an already-published site.
 GitHub's job summary links to the verified production address.
 

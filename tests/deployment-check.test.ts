@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -26,6 +26,8 @@ let files: Record<string, Buffer>;
 let overrides: Map<string, Override>;
 let requests: Map<string, number>;
 let transientPath: string | undefined;
+let staleIndexPaths: Set<string>;
+let assetsRequestedBeforeReady: string[];
 
 beforeEach(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), 'deployment-check-'));
@@ -38,6 +40,8 @@ beforeEach(async () => {
   overrides = new Map();
   requests = new Map();
   transientPath = undefined;
+  staleIndexPaths = new Set();
+  assetsRequestedBeforeReady = [];
   for (const [relative, body] of Object.entries(files)) {
     const target = path.join(directory, relative);
     await mkdir(path.dirname(target), { recursive: true });
@@ -47,6 +51,7 @@ beforeEach(async () => {
     const name = new URL(request.url!, 'http://localhost').pathname;
     const count = (requests.get(name) ?? 0) + 1;
     requests.set(name, count);
+    if (name.startsWith('/assets/') && staleIndexPaths.size) assetsRequestedBeforeReady.push(name);
     const file = name === '/' ? '/index.html' : name;
     const override = overrides.get(name);
     const mime: Record<string, string> = {
@@ -68,7 +73,16 @@ beforeEach(async () => {
     const status =
       name === transientPath && count === 1 ? 503 : (override?.status ?? (files[file] ? 200 : 404));
     response.writeHead(status, headers);
-    response.end(override?.body ?? files[file] ?? 'Missing synthetic asset');
+    let body = override?.body ?? files[file] ?? 'Missing synthetic asset';
+    if (staleIndexPaths.has(name)) {
+      if (count === 1)
+        body =
+          name === '/'
+            ? files[file].toString().replace('Synthetic', 'Previous!')
+            : `${files[file]}\nprior build`;
+      else staleIndexPaths.delete(name);
+    }
+    response.end(body);
   });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -91,6 +105,7 @@ afterEach(async () => {
       );
     }
   } finally {
+    vi.restoreAllMocks();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -187,12 +202,45 @@ describe('static deployment verification', () => {
   ])('rejects %s', async (_name, relative, override, error) => {
     overrides.set(relative, override);
     await expect(checkDeployment(url, directory)).rejects.toThrow(error);
+    expect(requests.get(relative)).toBe(1);
   });
 
   it('retries transient readiness errors without accepting a different asset', async () => {
     transientPath = WASM;
     await expect(checkDeployment(url, directory)).resolves.toMatchObject({ files: 4 });
     expect(requests.get(WASM)).toBe(2);
+  });
+
+  it('waits for both old entry routes to converge before requesting new assets', async () => {
+    staleIndexPaths = new Set(['/', '/index.html']);
+    await expect(checkDeployment(url, directory)).resolves.toMatchObject({ files: 4 });
+    expect(requests.get('/')).toBeGreaterThan(2);
+    expect(requests.get('/index.html')).toBeGreaterThan(2);
+    expect(assetsRequestedBeforeReady).toEqual([]);
+    expect(requests.get(JS)).toBe(1);
+  });
+
+  it('bounds permanently wrong entry bytes without requesting assets', async () => {
+    // Exercise the real timeout/abort path without spending 40 seconds in CI.
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) =>
+      timeout(milliseconds === 40_000 ? 1_000 : milliseconds),
+    );
+    overrides.set('/', { body: '<title>Permanently wrong deployment</title>' });
+    await expect(checkDeployment(url, directory)).rejects.toThrow(
+      'Production index did not become ready within 40 seconds',
+    );
+    expect(requests.get('/')).toBeGreaterThan(0);
+    expect([...requests.keys()].some((name) => name.startsWith('/assets/'))).toBe(false);
+  });
+
+  it('rejects invalid readiness headers immediately even when index bytes are stale', async () => {
+    overrides.set('/', {
+      body: '<title>Prior deployment</title>',
+      headers: { 'x-content-type-options': null },
+    });
+    await expect(checkDeployment(url, directory)).rejects.toThrow('missing nosniff');
+    expect([...requests.entries()]).toEqual([['/', 1]]);
   });
 
   it('rejects staged symlinks before making network requests', async () => {

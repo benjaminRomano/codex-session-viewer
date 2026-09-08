@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Codex Session Performance'
+  short_description: 'Find critical-path delays and improve completion time'
+  default_prompt: 'Use $codex-session-performance to analyze this session or turn, explain its critical path, and recommend concrete ways Codex could finish sooner.'

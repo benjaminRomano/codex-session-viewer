@@ -128,6 +128,27 @@ assert.deepEqual(
   JSON.parse(analyze_sessions(sessions, 'root', start, end)),
   native(sessions, ['--analyze', 'root', String(start), String(end)]),
 );
+// A process can outlive its turn; only a later explicit wait can block that turn.
+const persistent = structuredClone(wasm);
+persistent.agentOperations = [];
+persistent.turns = [
+  { ...wasm.turns[0], id: 'first', startTime: 0, endTime: 10 },
+  { ...wasm.turns[0], id: 'second', startTime: 20, endTime: 30 },
+];
+const template = wasm.spans.find((span) => span.callId === 'inner');
+persistent.spans = [
+  { ...template, id: 'server', turnId: 'first', track: 'shell', startTime: 1, endTime: 100 },
+  { ...template, id: 'thinking', turnId: 'second', track: 'inference', startTime: 20, endTime: 30 },
+  { ...template, id: 'poll', turnId: 'second', track: 'code', startTime: 24, endTime: 26 },
+];
+const persistentInput = JSON.stringify([persistent]);
+const persistentAnalysis = JSON.parse(analyze_sessions(persistentInput, 'root', 20, 30));
+assert.deepEqual(persistentAnalysis, native(persistentInput, ['--analyze', 'root', '20', '30']));
+assert.deepEqual(
+  persistentAnalysis.path.segments.map((segment) => segment.span.id),
+  ['thinking', 'poll', 'thinking'],
+);
+assert.equal(persistentAnalysis.path.total, 10);
 const aggregate = JSON.parse(aggregate_spans(JSON.stringify(wasm.spans)));
 assert.ok(aggregate.length > 0);
 assert.equal(wasm.metadata.malformedLines, 1);

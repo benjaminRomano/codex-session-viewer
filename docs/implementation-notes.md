@@ -573,3 +573,39 @@ gates, production build and native/WASM parity pass. External Chrome verifies
 flow visibility and keyboard navigation to the child turn. Independent review
 found no blocking issues; its suggested resume/close endpoint coverage is now
 included in the regression. The changed-source secret scan found no leaks.
+
+## Critical-path process lifetimes
+
+A local performance analysis found a preview server launched in an earlier turn
+claiming time on later turns' paths. Critical-path candidates now intersect their
+recorded owning turn as well as the requested scope. Full process lifetimes stay
+on the timeline and in work statistics; explicit polls in a later turn remain
+eligible there. Operations without available turn metadata keep the prior
+fallback. Synthetic tests cover all three cases and whole-session clipping.
+
+This changes derived analysis only; metadata and parsing are unchanged. Rebuild
+WASM without invalidating the metadata index. A server running inside its own
+turn can still require manual readiness/causality interpretation: the logs do
+not reliably encode when a service becomes nonblocking.
+
+Validation: all 59 Rust and 64 frontend/deployment tests, strict quality gates,
+production build, native/WASM parity, and the external Chrome flow/scope/critical-
+path scenario pass. Two local turn checks remove 506.206s and 165.878s of false
+server attribution while preserving full elapsed coverage. Real inputs remain
+outside fixtures. The first sandboxed frontend run failed to bind localhost
+(`listen EPERM`); the permitted localhost run passed without code changes.
+
+## Reusable performance analysis skill
+
+`skills/codex-session-performance` contains the distributable skill, optional
+evidence/reasoning references, and a Python standard-library helper for normalized
+exports. Rust retains ownership of rollout parsing and critical-path construction;
+the helper summarizes interval coverage and groups operation fragments without
+interpreting session payloads. Ten portable synthetic tests cover overlap,
+incomplete scopes, identity, descendant context, and exclusion of payload text.
+They run through `npm run check:skills`, the combined local check, and browser CI.
+
+The report contract favors a short diagnosis, actionable P0/P1/P2 bullets, and an
+ordered evidence timeline. It calls out semantic failures, background lifetimes,
+overlap, and unmeasured savings beside the affected claims. Private trial reports
+and real session inputs are not part of the package.

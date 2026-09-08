@@ -142,3 +142,15 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 - [x] Resolve relative task names in the sender's scope and add synthetic regression coverage, including duplicate names in nested agents.
 - [x] Verify native/WASM parity, Chrome flow rendering, quality gates and independent review; publish through the reviewed flow-fix branch.
 - [x] Route spawn arrows to the first new child turn, excluding inherited history; keep sends on received messages. Add regression coverage.
+
+## Critical-path lifetime scope
+
+- [x] Prevent a process surviving its launching turn from claiming later turns' critical paths; preserve its timeline/statistics and explicit later waits.
+- [x] Add synthetic regressions for turn boundaries, later polling, and missing legacy turn metadata.
+- [x] Verify native/WASM parity, required quality/build checks, relevant external Chrome scenarios, and the reported local turn scopes.
+
+## Session performance skill publication
+
+- [x] Package the reusable skill, concise report guidance, evidence references, and normalized-trace helper without private session data.
+- [x] Make the helper's synthetic tests portable and include them in local checks and CI; document skill usage.
+- [ ] Complete independent review and open a draft PR for the skill and critical-path timing correction.

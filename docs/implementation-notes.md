@@ -610,6 +610,10 @@ ordered evidence timeline. It calls out semantic failures, background lifetimes,
 overlap, and unmeasured savings beside the affected claims. Private trial reports
 and real session inputs are not part of the package.
 
+Each recommendation includes an estimated saving with units, affected turn/session,
+confidence, and its main assumption. Zero parent savings and estimates that cannot
+yet be quantified remain explicit; overlapping opportunities are not summed.
+
 Publication verification: the combined check passes all 59 Rust, 64 frontend,
 and 10 helper tests plus lint, format, type, and unused-code gates. Independent
 review found no actionable issues, and the changed-file secret scan was clean.

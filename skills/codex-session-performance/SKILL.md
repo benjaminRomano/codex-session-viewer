@@ -45,10 +45,12 @@ Read [references/worked-patterns.md](references/worked-patterns.md) only when ex
 
 Default to a one-sentence diagnosis, a few prioritized bullets, and a compact timeline. Aim for roughly 300–600 words for a multi-turn report; a single turn usually needs less. These are editing targets, not reasons to omit decisive evidence.
 
-- **[P0/P1/P2] Concrete action — observed problem.** Say where to change the behavior, cite the relevant call/line or timestamp, and give the expected benefit with its uncertainty. Include a brief success check when it is not obvious. Prefer one compact paragraph per recommendation; merge related symptoms.
+- **[P0/P1/P2] Concrete action — observed problem.** Say where to change the behavior and cite the relevant call/line or timestamp. Every recommendation must include **Estimated saving:** a range in seconds or minutes per affected turn (or explicitly named session), confidence, and the key assumption. For example: `Estimated saving: 40–70 seconds per turn (medium confidence; avoids the final failed retry).` Include a brief success check when it is not obvious. Prefer one compact paragraph per recommendation; merge related symptoms.
 - **Timeline:** use a small table with `Turn / elapsed | Sequence that determined completion | Source`. Show ordered intervals, failed/dead-end calls and their recovery, and meaningful overlapping work. Expand only the bottleneck when a detailed trace is requested; keep the complete trace in a linked local artifact when long. Use relative offsets or one stated timezone.
 
 Use P0 for completion/correctness blockers or exceptionally costly recurring failures; P1 for material, supported completion-time improvements; P2 for smaller gains or experiments. Do not force every priority to appear. Rank by exposed delay, recurrence, confidence, effort, and risk, rather than raw tool runtime.
+
+Keep the saving field even when the benefit is uncertain. Give a defensible range or bound with its assumptions; use `0 seconds on the parent path` for work that finishes before the blocking branch, and report child/tool savings separately if useful. If no numeric estimate is defensible, write `Estimated saving: not yet quantifiable` and name the missing measurement. Do not invent precision or add overlapping recommendation estimates.
 
 Put evidence and caveats next to the claims they qualify. Do not repeat each finding in separate cause, recommendation, counterfactual, and summary sections. Omit generic framing, praise, rhetorical contrasts, invented labels, and headings about the analysis process. Use concrete verbs and ordinary language. If a turn has no supported material opportunity, say so; do not invent one to fill the format.
 

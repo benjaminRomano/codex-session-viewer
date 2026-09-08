@@ -100,3 +100,10 @@ in the repository’s Actions tab. Local results below are recorded separately.
 - [x] Complete final Chrome/virtualization/selection/critical-panel verification, quality gates, benchmark and independent review. 49 Rust and 36 frontend tests pass; all 20 Chrome scenarios are covered by the full run plus corrected focused reruns. The late resize/layout findings and their fixes are recorded in the notes.
 - [x] Scan the exact publication file set for secrets and private data; exclude real sessions, captures, reports, generated files and browser profiles. Gitleaks and a manual private-data audit cover the 80-file source set.
 - [x] Commit and push the finished source to the existing `benjaminRomano/codex-session-viewer` repository. No PR or site deployment is requested.
+
+## Hosted CI follow-up
+
+- [x] Diagnose the first completed hosted run: all 20 Chrome scenarios and native/WASM gates passed; the standalone benchmark timed out waiting for network idleness before reading files.
+- [x] Isolate the benchmark document from the application, await imported modules directly, add content-free startup milestones and bound the synthetic CI step.
+- [x] Retire failed idle parser workers; restore capacity only for queued work and settle jobs on constructor failures. The three additional regressions bring frontend coverage to 39 tests, alongside 49 Rust tests.
+- [x] Run strict quality gates, production build and independent review for the follow-up; verify the synthetic Chrome benchmark without errors.

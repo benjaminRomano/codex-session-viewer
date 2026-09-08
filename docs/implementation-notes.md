@@ -266,3 +266,34 @@ the local checks recorded above and can be inspected in GitHub Actions. No draft
 PR, release or Pages deployment was created. The final local Chrome page was
 refreshed to the optimized build: selected-only flows, no toolbar or alert, and
 14 mounted entries for a real log containing more than 7,500 entries.
+
+## Hosted verification follow-up
+
+The first completed hosted run passed Rust on Linux/macOS, all 36 frontend tests,
+native/WASM parity and all 20 Chrome scenarios, then failed the standalone browser
+benchmark before it selected any files. Its log confirmed a ten-minute
+`page.goto(..., waitUntil: 'networkidle')` timeout. The development application's
+background network activity is not a valid readiness signal for this benchmark.
+The benchmark now opens an empty document on the Vite origin, imports the store
+and parser modules explicitly, and waits only for DOM readiness with a bounded
+startup timeout. It no longer mounts a second application's idle workers alongside
+its measured pool. Startup milestones contain no session content, and the
+synthetic CI benchmark has a separate three-minute step limit.
+
+Inspection also found an independent worker failure loop: an idle parser worker
+that failed to load immediately spawned another worker, even with no queued work.
+Failed slots now retire and recreate capacity only when an eligible job needs it.
+Active failures reject their job and advance the queue; failed constructors also
+settle queued jobs instead of leaving them pending. Three focused regressions
+cover idle failure, active/queued failure with cancellation, and constructor
+failure. This brings the frontend suite to 39 tests; Rust remains at 49. No
+evidence establishes that this loop caused the hosted navigation timeout.
+
+The follow-up passed strict TypeScript/Rust quality gates, the production build,
+independent review and all six affected Chrome engine/local-loading scenarios.
+The local macOS run again required cleanup of verified test-owned updater pipes
+after its assertions passed; the runner then exited successfully. The isolated
+synthetic browser benchmark completed with four files, four warm cache hits, all
+four agents and no errors: 1.575 s cold, 20.8 ms warm and 166.5 ms for the eager
+graph. Hosted results are recorded by the verification workflow on the follow-up
+commit.

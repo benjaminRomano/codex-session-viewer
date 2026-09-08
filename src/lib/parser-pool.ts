@@ -48,6 +48,7 @@ interface Slot {
   worker: Worker;
   job?: Job;
   interactiveOnly: boolean;
+  retired: boolean;
 }
 
 export function abortError(): DOMException {
@@ -96,7 +97,7 @@ export class ParserPool implements ParserService {
   }
 
   private makeSlot(interactiveOnly = false): Slot {
-    const slot: Slot = { worker: this.createWorker(), interactiveOnly };
+    const slot: Slot = { worker: this.createWorker(), interactiveOnly, retired: false };
     slot.worker.onmessage = (
       event: MessageEvent<{
         id: number;
@@ -122,11 +123,16 @@ export class ParserPool implements ParserService {
       this.pump();
     };
     slot.worker.onerror = (event: ErrorEvent) => {
+      if (slot.retired) return;
+      slot.retired = true;
+      slot.worker.onmessage = null;
+      slot.worker.onerror = null;
       if (slot.job)
         this.finish(slot.job, undefined, new Error(event.message || 'Parser worker failed'));
+      slot.job = undefined;
       slot.worker.terminate();
-      const index = this.slots.indexOf(slot);
-      if (!this.disposed && index >= 0) this.slots[index] = this.makeSlot(slot.interactiveOnly);
+      // A module-load failure can recur forever while idle. Restore capacity
+      // only when an eligible queued job actually needs the worker.
       this.pump();
     };
     return slot;
@@ -176,12 +182,25 @@ export class ParserPool implements ParserService {
 
   private pump(): void {
     if (this.disposed) return;
-    for (const slot of this.slots) {
+    for (let slotIndex = 0; slotIndex < this.slots.length; slotIndex++) {
+      let slot = this.slots[slotIndex];
       if (slot.job) continue;
       let index = this.queue.findIndex((job) => job.operation !== 'metadata');
       if (index < 0 && !slot.interactiveOnly && this.queue.length) index = 0;
       if (index < 0) continue;
       const [job] = this.queue.splice(index, 1);
+      if (slot.retired) {
+        try {
+          slot = this.makeSlot(slot.interactiveOnly);
+          this.slots[slotIndex] = slot;
+        } catch (error) {
+          this.finish(job, undefined, error instanceof Error ? error : new Error(String(error)));
+          // Constructor failures have no worker error event to advance the
+          // remaining queue. Each retry consumes another actual queued job.
+          queueMicrotask(() => this.pump());
+          continue;
+        }
+      }
       slot.job = job;
       slot.worker.postMessage({
         id: job.id,

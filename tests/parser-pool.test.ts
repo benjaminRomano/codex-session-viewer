@@ -15,9 +15,90 @@ class FakeWorker {
   finish(id: number) {
     this.onmessage?.({ data: { id, result: { id: `result-${id}` } } } as MessageEvent);
   }
+  fail(message = 'Worker module failed to load') {
+    this.onerror?.({ message } as ErrorEvent);
+  }
 }
 
 describe('parser worker pool', () => {
+  it('retires a failed idle worker and creates a replacement only for new work', async () => {
+    const workers: FakeWorker[] = [];
+    const pool = new ParserPool(1, () => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      return worker as unknown as Worker;
+    });
+    const staleError = workers[0].onerror;
+    workers[0].fail();
+    expect(workers[0].terminated).toBe(true);
+    expect(workers[0].onmessage).toBeNull();
+    expect(workers[0].onerror).toBeNull();
+    staleError?.({ message: 'A second queued error event' } as ErrorEvent);
+    await Promise.resolve();
+    expect(workers).toHaveLength(1);
+    const result = pool.parseSession(new File(['{}'], 'example.jsonl'));
+    expect(workers).toHaveLength(2);
+    expect(workers[1].messages.map((message) => message.operation)).toEqual(['session']);
+    workers[1].finish(1);
+    await expect(result).resolves.toMatchObject({ id: 'result-1' });
+    workers[1].fail();
+    expect(workers).toHaveLength(2);
+    pool.dispose();
+    await expect(pool.scanMetadata(new File(['{}'], 'example.jsonl'))).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(workers).toHaveLength(2);
+  });
+
+  it('reports active failures, advances queued work and stops replacing after the queue drains', async () => {
+    const workers: FakeWorker[] = [];
+    const pool = new ParserPool(1, () => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      return worker as unknown as Worker;
+    });
+    const file = new File(['{}'], 'example.jsonl');
+    const active = pool.scanMetadata(file).catch((error) => error as Error);
+    const abort = new AbortController();
+    const cancelled = pool
+      .parseSession(file, { signal: abort.signal })
+      .catch((error) => error as Error);
+    const next = pool.scanMetadata(file).catch((error) => error as Error);
+    abort.abort();
+    workers[0].fail('Active parser failed');
+    expect(await active).toMatchObject({ message: 'Active parser failed' });
+    expect(await cancelled).toMatchObject({ name: 'AbortError' });
+    expect(workers).toHaveLength(2);
+    expect(workers[1].messages.map((message) => message.id)).toEqual([3]);
+    workers[1].fail('Replacement parser failed');
+    expect(await next).toMatchObject({ message: 'Replacement parser failed' });
+    expect(workers).toHaveLength(2);
+    pool.dispose();
+  });
+
+  it('rejects queued jobs when demand-driven worker construction fails instead of hanging them', async () => {
+    const worker = new FakeWorker();
+    let attempts = 0;
+    const pool = new ParserPool(1, () => {
+      if (attempts++ > 0) throw new Error('Worker construction denied');
+      return worker as unknown as Worker;
+    });
+    const file = new File(['{}'], 'example.jsonl');
+    const jobs = [pool.scanMetadata(file), pool.scanMetadata(file), pool.parseSession(file)].map(
+      (job) => job.catch((error) => error as Error),
+    );
+    worker.fail('Active parser failed');
+    expect(await Promise.all(jobs)).toMatchObject([
+      { message: 'Active parser failed' },
+      { message: 'Worker construction denied' },
+      { message: 'Worker construction denied' },
+    ]);
+    expect(attempts).toBe(3);
+    await Promise.resolve();
+    expect(attempts).toBe(3);
+    pool.dispose();
+  });
+
   it('keeps a worker available for a selected session during a large metadata scan', async () => {
     const workers: FakeWorker[] = [];
     const pool = new ParserPool(4, () => {

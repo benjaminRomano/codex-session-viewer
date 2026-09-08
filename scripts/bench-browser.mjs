@@ -82,6 +82,7 @@ const url = value('--url') ?? 'http://127.0.0.1:5175';
 const output = path.resolve(value('--output') ?? 'outputs/benchmarks/browser.json');
 try {
   if (!value('--url')) {
+    console.log('CODEX_BENCH {"phase":"server-startup"}');
     // Other agents may be editing source while a multi-gigabyte scan runs. Disable HMR
     // so unrelated edits cannot navigate away and destroy a benchmark in progress.
     server = await createServer({
@@ -93,14 +94,22 @@ try {
     headless: !args.includes('--headed'),
     channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome',
   };
+  console.log('CODEX_BENCH {"phase":"browser-startup"}');
   browser = await chromium.launch(launch);
   const page = await browser.newPage();
-  page.setDefaultTimeout(600_000);
+  page.setDefaultTimeout(isReal ? 600_000 : 30_000);
   page.on('console', (event) => {
     const text = event.text();
     if (text.startsWith('CODEX_BENCH ')) console.log(text);
   });
-  await page.goto(url, { waitUntil: 'networkidle' });
+  console.log('CODEX_BENCH {"phase":"page-startup"}');
+  // This measures SessionStore/ParserPool, not a second application instance.
+  // Keep the origin for module imports, without mounting the UI's own workers.
+  await page.route(new URL(url).href, (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }),
+  );
+  // Awaited imports below provide readiness; background network idleness does not.
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.evaluate(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -111,6 +120,7 @@ try {
   });
   // Playwright sets local paths with Chromium's file chooser protocol. It does not read and
   // serialize 21 GB of bytes through Node or send them to the Vite server.
+  console.log('CODEX_BENCH {"phase":"file-selection"}');
   await page.locator('#benchmark-local-files').setInputFiles(files.map((file) => file.absolute));
   console.log(
     `CODEX_BENCH ${JSON.stringify({ phase: 'start', source: isReal ? 'local' : 'demo', files: rolloutCount, bytes: totalBytes, workers })}`,

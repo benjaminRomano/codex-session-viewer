@@ -77,6 +77,10 @@ the browser benchmark, and retains verification reports and the static bundle.
 Jobs have time limits, actions are pinned to commit hashes, and permissions are
 read-only. Dependabot covers npm, Cargo and Actions updates.
 
+Browser retries retain diagnostic evidence, but a flaky test still fails CI.
+Investigate its first failure rather than treating a successful retry as proof
+that the original behavior was correct.
+
 The manual Pages workflow calls the same verification workflow and downloads its
 successful static artifact. Deployment receives Pages/OIDC permissions only in
 the deploy job. It does not rebuild a different artifact after testing. Local

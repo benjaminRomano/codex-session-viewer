@@ -297,3 +297,45 @@ synthetic browser benchmark completed with four files, four warm cache hits, all
 four agents and no errors: 1.575 s cold, 20.8 ms warm and 166.5 ms for the eager
 graph. Hosted results are recorded by the verification workflow on the follow-up
 commit.
+
+## Scroll anchoring after the hosted retry
+
+The next hosted run completed every job, including the repaired benchmark, but
+its detailed report showed the large virtual-log resize scenario passed only on
+retry. The synthetic trace showed a persistent jump of several hundred rows when
+narrowing the feed with a long expanded prompt retained above the viewport.
+TanStack's default remeasurement policy skips above-viewport compensation during
+backward scrolling. That policy also skipped the retained prompt's large width
+change; waiting for scrolling to stop did not restore the lost position.
+
+The log now preserves the first-measure policy and compensates remeasured rows
+entirely above the viewport regardless of the last scroll direction. Rows that
+span the viewport still do not shift it as their bottom grows. The existing
+resize regression explicitly combines upward scrolling with a width change and
+keeps its mounted-row, position, overlap and full-payload assertions. CI now fails
+on flaky browser tests, even when their retry passes, so this class of regression
+cannot be hidden by an otherwise green workflow.
+
+The compensation predicate alone was insufficient: two of three local attempts
+still jumped, and React reported nested `flushSync` calls during ref measurement.
+Disabling synchronous React flushes removed those errors and the large jump, but
+the anchor still drifted by 385 px after waiting for measurements. Keeping that
+failed approach would have concealed a smaller version of the same bug.
+The asynchronous-only version updated the size cache and scroll offset before
+recomputing row positions. Subsequent observer callbacks compared old positions
+against the new offset and incorrectly compensated rows below the anchor.
+
+The final layout uses TanStack's direct DOM update mode for the sizer height and
+row positions, with React continuing to own row contents and the mounted range.
+React no longer writes competing height/transform styles. Measurement callbacks
+update the scroll extent and positions together before scheduling any required
+React render. The regression also rejects console errors and polls the unchanged
+80 px anchor bound until deferred measurements settle.
+
+With that layout ownership, the strengthened 4,000-entry Chrome scenario passed
+three consecutive runs with retries disabled (46.3 s, 43.7 s and 39.8 s). All
+mounted-row, anchor-position, overlap, exact content and console-error assertions
+passed. The full quality checks still pass: 49 Rust tests, 39 frontend tests,
+strict lint/format/unused-code checks and the production build.
+The separate log/timeline hover, selection and content-phase scenario also passed
+(38.3 s), and the independent final review found no remaining issue.

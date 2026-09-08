@@ -98,4 +98,11 @@ Rust's workspace lint policy forbids unsafe code, denies unused must-use results
 
 Rust emits ordered `logEntries` referring to normalized spans; React does not reinterpret JSONL records. The dock renders a continuous, measured virtual list of messages and call/result entries using TanStack Virtual. It mounts the visible range plus a small overscan and at most two retained rows for expanded-content state and height correction. Full contents use the existing Rust detail parser; only very large individual payloads have content pages. Hover highlights a span without changing selection; activation centers it at the current zoom while retaining all agents, spans, scope and the Log tab. `F` explicitly zooms to the selection. Selected-span links and all links have independent `<` and `>` shortcuts; selected links are visible by default.
 
+The virtualizer owns the log's sizer height and row transforms through direct DOM
+updates; React owns the mounted rows and their contents. Deferred measurements
+update scroll geometry together, without nested synchronous React renders.
+Remeasured rows entirely above the viewport preserve the reading anchor even
+during upward scrolling, including a retained expanded payload that rewraps when
+the dock narrows.
+
 Workers fetch the explicit bundled WASM URL and validate its binary header before initialization. A failed request is retried once and a rejected initialization can be retried later. Production builds preserve prior hashed assets in `dist/` so a page that was already open can still start its workers after a rebuild. Fresh CI checkouts produce clean artifacts; delete `dist/` only when no old local clients need it.

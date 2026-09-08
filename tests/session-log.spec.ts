@@ -165,6 +165,9 @@ test('session log continuously virtualizes thousands of variable-height entries 
 }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text());
+  });
   const original = await readFile(path.join(process.cwd(), 'public/demo/demo-root.jsonl'), 'utf8');
   const records = original
     .trim()
@@ -285,24 +288,43 @@ test('session log continuously virtualizes thousands of variable-height entries 
   await expect.poll(() => mounted.count()).toBeLessThan(80);
   await expect(user.locator('.prompt-block')).toHaveText(prompt);
   await expect(page.locator('.session-log-entry.expanded')).toHaveCount(1);
-  const anchor = await scroll.evaluate((element) => {
-    const top = element.getBoundingClientRect().top;
-    const row = Array.from(element.querySelectorAll<HTMLElement>('.session-log-entry')).find(
-      (entry) => entry.getBoundingClientRect().top >= top + 10,
-    );
-    return row
-      ? { id: row.dataset.logId!, offset: row.getBoundingClientRect().top - top }
-      : undefined;
-  });
+  const anchor = await scroll.evaluate(
+    (element) =>
+      new Promise<{ id: string; offset: number } | undefined>((resolve) => {
+        // Resize during a real backward scroll, before the virtualizer's idle
+        // debounce can clear its direction. Its scroll handler runs first.
+        element.addEventListener(
+          'scroll',
+          () => {
+            const viewport = element.getBoundingClientRect();
+            const row = Array.from(
+              element.querySelectorAll<HTMLElement>('.session-log-entry'),
+            ).find((entry) => {
+              const rect = entry.getBoundingClientRect();
+              return rect.top >= viewport.top + 10 && rect.top < viewport.bottom;
+            });
+            const result = row
+              ? { id: row.dataset.logId!, offset: row.getBoundingClientRect().top - viewport.top }
+              : undefined;
+            element.closest<HTMLElement>('.session-log')!.style.maxWidth = '360px';
+            resolve(result);
+          },
+          { once: true },
+        );
+        element.scrollTop -= 40;
+      }),
+  );
   expect(anchor).toBeDefined();
-  await page.locator('.session-log').evaluate((element) => {
-    element.style.maxWidth = '360px';
-  });
   await settleScroll(page);
   const anchoredRow = page.locator(`.session-log-entry[data-log-id="${anchor!.id}"]`);
   await expect(anchoredRow).toHaveCount(1);
-  const nextOffset = (await anchoredRow.boundingBox())!.y - (await scroll.boundingBox())!.y;
-  expect(Math.abs(nextOffset - anchor!.offset)).toBeLessThan(80);
+  await expect
+    .poll(async () => {
+      const row = await anchoredRow.boundingBox();
+      const viewport = await scroll.boundingBox();
+      return row && viewport ? Math.abs(row.y - viewport.y - anchor!.offset) : Infinity;
+    })
+    .toBeLessThan(80);
   const rowOverlaps = await scroll.evaluate((element) => {
     const rows = Array.from(element.querySelectorAll('.session-log-virtual-row')).map((row) =>
       row.getBoundingClientRect(),

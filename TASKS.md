@@ -107,3 +107,4 @@ in the repository’s Actions tab. Local results below are recorded separately.
 - [x] Isolate the benchmark document from the application, await imported modules directly, add content-free startup milestones and bound the synthetic CI step.
 - [x] Retire failed idle parser workers; restore capacity only for queued work and settle jobs on constructor failures. The three additional regressions bring frontend coverage to 39 tests, alongside 49 Rust tests.
 - [x] Run strict quality gates, production build and independent review for the follow-up; verify the synthetic Chrome benchmark without errors.
+- [x] Fix the retained expanded-row resize jump exposed by the hosted browser retry; three consecutive Chrome runs pass without retries or browser errors. Independent review has no findings, and CI now fails on flaky tests.

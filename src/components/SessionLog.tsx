@@ -222,10 +222,23 @@ function LogFeed({
     overscan: 12,
     rangeExtractor,
     paddingEnd: 8,
+    // Commit the sizer and row positions with scroll compensation. Deferring
+    // their geometry to React can measure a newly exposed range in old positions.
+    directDomUpdates: true,
     // Expansion/width changes can resize the scroll extent during observer
     // delivery. Apply those measurements on the next frame, outside the loop.
     useAnimationFrameWithResizeObserver: true,
+    // Ref measurements can run during a React commit. Queue their render
+    // updates instead of recursively flushing a half-updated virtual range.
+    useFlushSync: false,
   });
+  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
+    const offset = (instance.scrollOffset ?? 0) + instance.scrollAdjustments;
+    // Static log rows can rewrap while the user scrolls upward. Preserve the
+    // reading anchor even then: a retained expanded row above it may grow by
+    // thousands of pixels. Rows spanning the fold must not move that anchor.
+    return instance.itemSizeCache.has(item.key) ? item.end <= offset : item.start < offset;
+  };
   useEffect(() => () => hoverCallback.current(null), []);
   return (
     <div className="session-log" data-entry-count={items.length}>
@@ -240,7 +253,7 @@ function LogFeed({
         tabIndex={0}
         onScroll={() => onHover(null)}
       >
-        <div className="session-log-virtual-space" style={{ height: virtualizer.getTotalSize() }}>
+        <div className="session-log-virtual-space" ref={virtualizer.containerRef}>
           {virtualizer.getVirtualItems().map((row) => {
             const item = items[row.index];
             return (
@@ -249,7 +262,6 @@ function LogFeed({
                 data-index={row.index}
                 ref={virtualizer.measureElement}
                 className="session-log-virtual-row"
-                style={{ transform: `translateY(${row.start}px)` }}
               >
                 <LogCard
                   item={item}

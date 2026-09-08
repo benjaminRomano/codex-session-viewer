@@ -3,7 +3,8 @@
 use crate::{classify, parser_error, prompt_content, record_output, s, Engine, ParserError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeSet;
+use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet};
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize, Default)]
@@ -33,12 +34,149 @@ struct Details {
     next_offset: Option<u64>,
     warnings: Vec<String>,
 }
-fn full(v: &Value) -> String {
-    v.as_str()
-        .map(str::to_owned)
-        .unwrap_or_else(|| serde_json::to_string_pretty(v).unwrap())
+// JSON-pointer provenance for strings with another page. Offsets refer to the
+// retained JSON, so equal string values in unrelated fields cannot collide.
+pub(crate) struct CapturedRecord {
+    value: Value,
+    paged_paths: Vec<String>,
 }
-fn capture(result: &mut Details, record: &Value) {
+impl CapturedRecord {
+    pub(crate) fn new(value: Value, line: &str, base: usize, offsets: &BTreeSet<usize>) -> Self {
+        fn visit(
+            raw: &serde_json::value::RawValue,
+            path: &str,
+            base: usize,
+            offsets: &BTreeSet<usize>,
+            paths: &mut Vec<String>,
+        ) {
+            let text = raw.get();
+            match text.as_bytes().first() {
+                Some(b'"') if offsets.contains(&(text.as_ptr() as usize - base)) => {
+                    paths.push(path.into())
+                }
+                Some(b'{') => {
+                    if let Ok(fields) =
+                        serde_json::from_str::<BTreeMap<String, &serde_json::value::RawValue>>(text)
+                    {
+                        for (key, child) in fields {
+                            let key = key.replace('~', "~0").replace('/', "~1");
+                            visit(child, &format!("{path}/{key}"), base, offsets, paths);
+                        }
+                    }
+                }
+                Some(b'[') => {
+                    if let Ok(items) =
+                        serde_json::from_str::<Vec<&serde_json::value::RawValue>>(text)
+                    {
+                        for (index, child) in items.iter().enumerate() {
+                            visit(child, &format!("{path}/{index}"), base, offsets, paths);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut paged_paths = Vec::new();
+        if !offsets.is_empty() {
+            if let Ok(raw) = serde_json::from_str::<&serde_json::value::RawValue>(line) {
+                visit(raw, "", base, offsets, &mut paged_paths);
+            }
+        }
+        Self { value, paged_paths }
+    }
+}
+
+struct ContentReader<'a> {
+    paged: Vec<&'a Value>,
+    has_more: Cell<bool>,
+}
+impl ContentReader<'_> {
+    fn mark(&self, value: &Value) {
+        if self.paged.iter().any(|paged| std::ptr::eq(*paged, value)) {
+            self.has_more.set(true);
+        }
+        match value {
+            Value::Array(items) => items.iter().for_each(|item| self.mark(item)),
+            Value::Object(fields) => fields.values().for_each(|item| self.mark(item)),
+            _ => {}
+        }
+    }
+    fn full(&self, v: &Value) -> String {
+        self.mark(v);
+        v.as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| serde_json::to_string_pretty(v).unwrap())
+    }
+    fn text(&self, v: &Value, key: &str) -> String {
+        if let Some(value) = v.get(key).filter(|value| value.is_string()) {
+            self.mark(value);
+        }
+        s(v, key).into()
+    }
+    fn command(&self, v: &Value) -> String {
+        v.as_array()
+            .map(|parts| {
+                parts
+                    .iter()
+                    .filter(|part| part.is_string())
+                    .map(|part| self.full(part))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .unwrap_or_else(|| self.full(v))
+    }
+    fn prompt(&self, v: &Value) -> String {
+        if v.is_string() {
+            self.mark(v);
+        }
+        if let Some(items) = v.as_array() {
+            for item in items
+                .iter()
+                .filter(|item| s(item, "type") != "encrypted_content")
+            {
+                if let Some(text) = item.get("text").filter(|value| value.is_string()) {
+                    self.mark(text);
+                }
+            }
+        }
+        prompt_content(v)
+    }
+    fn output(&self, v: &Value) -> Option<String> {
+        // Match record_output's primary-field precedence and additional errors.
+        let material =
+            |value: &&Value| !value.is_null() && !value.as_str().is_some_and(str::is_empty);
+        if let Some(value) = [
+            "aggregated_output",
+            "output",
+            "result",
+            "results",
+            "stdout",
+            "formatted_output",
+        ]
+        .iter()
+        .filter_map(|key| v.get(key))
+        .find(material)
+        {
+            self.mark(value);
+        }
+        for key in ["stderr", "error", "error_message"] {
+            if let Some(value) = v.get(key) {
+                self.mark(value);
+            }
+        }
+        record_output(v)
+    }
+}
+fn capture(result: &mut Details, captured: &CapturedRecord) {
+    let record = &captured.value;
+    let reader = ContentReader {
+        paged: captured
+            .paged_paths
+            .iter()
+            .filter_map(|path| record.pointer(path))
+            .collect(),
+        has_more: Cell::new(false),
+    };
     let payload = record.get("payload").unwrap_or(record);
     let kind = s(payload, "type");
     if matches!(
@@ -49,7 +187,7 @@ fn capture(result: &mut Details, record: &Value) {
             .get("arguments")
             .or_else(|| payload.get("input"))
             .or_else(|| payload.get("action"))
-            .map(full)
+            .map(|value| reader.full(value))
             .unwrap_or_default();
         let obj = serde_json::from_str::<Value>(&args).unwrap_or(Value::Null);
         let track = classify(s(payload, "name"), &args);
@@ -61,7 +199,7 @@ fn capture(result: &mut Details, record: &Value) {
         } else {
             obj.get("cmd")
                 .or_else(|| obj.get("command"))
-                .map(full)
+                .map(|value| reader.full(value))
                 .unwrap_or_else(|| args.clone())
         });
         result.language = Some(
@@ -77,16 +215,16 @@ fn capture(result: &mut Details, record: &Value) {
         result.args = Some(args);
     }
     if matches!(kind, "function_call_output" | "custom_tool_call_output") {
-        result.output = payload.get("output").map(full);
+        result.output = payload.get("output").map(|value| reader.full(value));
     }
     if kind == "user_message" {
-        result.prompt = Some(s(payload, "message").into());
+        result.prompt = Some(reader.text(payload, "message"));
     }
     if kind == "agent_message" && payload.get("message").is_some() {
-        result.output = Some(s(payload, "message").into());
+        result.output = Some(reader.text(payload, "message"));
     }
     if kind == "message" {
-        let text = prompt_content(&payload["content"]);
+        let text = reader.prompt(&payload["content"]);
         if s(payload, "role") == "user" {
             result.prompt = Some(text);
         } else {
@@ -94,21 +232,21 @@ fn capture(result: &mut Details, record: &Value) {
         }
     }
     if kind == "agent_message" && payload.get("content").is_some() {
-        result.prompt = Some(prompt_content(&payload["content"]));
+        result.prompt = Some(reader.prompt(&payload["content"]));
         result.output = result.prompt.clone();
         if payload["content"].as_array().is_some_and(|items| {
             items
                 .iter()
                 .any(|item| s(item, "type") == "encrypted_content")
         }) {
-            result.args = Some(full(payload));
+            result.args = Some(reader.full(payload));
             result
                 .warnings
                 .push("The task payload is encrypted in this session file.".into());
         }
     }
     if s(record, "type") == "inter_agent_communication" {
-        result.prompt = Some(s(payload, "content").into());
+        result.prompt = Some(reader.text(payload, "content"));
         result.output = result.prompt.clone();
     }
     if matches!(
@@ -122,80 +260,68 @@ fn capture(result: &mut Details, record: &Value) {
             | "web_search_begin"
             | "web_search_end"
     ) {
-        if kind.ends_with("_begin") || result.args.is_none() {
-            result.args = Some(full(payload));
+        let web_action = kind == "web_search_end"
+            && ["command", "changes", "invocation"]
+                .iter()
+                .all(|key| payload.get(key).is_none());
+        if !web_action && (kind.ends_with("_begin") || result.args.is_none()) {
+            result.args = Some(reader.full(payload));
         }
         if let Some(command) = payload.get("command") {
-            result.code = Some(
-                command
-                    .as_array()
-                    .map(|parts| {
-                        parts
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    })
-                    .unwrap_or_else(|| full(command)),
-            );
+            result.code = Some(reader.command(command));
             result.language = Some("bash".into());
         } else if let Some(changes) = payload.get("changes") {
-            result.code = Some(full(changes));
+            result.code = Some(reader.full(changes));
             result.language = Some("json".into());
         } else if let Some(invocation) = payload.get("invocation") {
-            result.code = Some(full(invocation));
+            result.code = Some(reader.full(invocation));
             result.language = Some("json".into());
-        } else if kind == "web_search_end" {
+        } else if web_action {
+            for key in ["query", "action"] {
+                if let Some(value) = payload.get(key) {
+                    reader.mark(value);
+                }
+            }
             let action =
                 serde_json::json!({"query":payload.get("query"),"action":payload.get("action")});
-            result.args = Some(full(&action));
-            result.code = Some(full(&action));
+            result.args = Some(reader.full(&action));
+            result.code = Some(reader.full(&action));
             result.language = Some("json".into());
         }
         if kind.ends_with("_end") {
-            result.output = record_output(payload);
+            result.output = reader.output(payload);
         }
     }
     if kind == "item_completed" || kind == "item_started" {
         let item = &payload["item"];
         if s(item, "type") == "UserMessage" {
-            result.prompt = Some(prompt_content(&item["content"]));
+            result.prompt = Some(reader.prompt(&item["content"]));
         }
         if let Some(command) = item.get("command") {
-            result.code = Some(
-                command
-                    .as_array()
-                    .map(|parts| {
-                        parts
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    })
-                    .unwrap_or_else(|| full(command)),
-            );
+            result.code = Some(reader.command(command));
             result.language = Some("bash".into());
         }
         if let Some(args) = item.get("arguments") {
-            result.args = Some(full(args));
+            result.args = Some(reader.full(args));
             if result.code.is_none() {
                 result.code = result.args.clone();
                 result.language = Some("json".into());
             }
         }
         if let Some(changes) = item.get("changes") {
-            result.code = Some(full(changes));
+            result.code = Some(reader.full(changes));
             result.language = Some("json".into());
         }
-        if let Some(output) = record_output(item) {
+        if let Some(output) = reader.output(item) {
             result.output = Some(output);
         } else if item.get("content").is_some() && s(item, "type") != "UserMessage" {
-            result.output = Some(prompt_content(&item["content"]));
+            result.output = Some(reader.prompt(&item["content"]));
         }
         if s(item, "type") == "Reasoning" {
-            result.output = Some(full(item));
+            result.output = Some(reader.full(item));
         }
     }
+    result.has_more |= reader.has_more.get();
 }
 
 #[wasm_bindgen]
@@ -257,8 +383,6 @@ impl DetailParser {
         for record in &self.engine.captured {
             capture(&mut result, record);
         }
-        result.has_more =
-            self.engine.max_string_bytes > self.offset.saturating_add(self.page_size as u64);
         if result.has_more {
             result.next_offset = Some(self.offset.saturating_add(self.page_size as u64));
         }

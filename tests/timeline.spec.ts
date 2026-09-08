@@ -49,13 +49,13 @@ test('canvas multiselection, highlighted code, area selection, and measurement',
   page.on('pageerror', (error) => errors.push(error.message));
   await openExample(page);
   const box = await geometry(page);
-  const code = box.at(22, 4);
+  const code = box.at(22, 5);
   await page.mouse.click(code.x, code.y);
   await expect(page.locator('.details-tabs')).toContainText('Selection (1)');
   await expect(page.locator('.span-detail-title')).toContainText('functions.exec');
   await expect(page.locator('.code-block')).toContainText('Promise.all');
   await expect(page.locator('.code-block .hljs-keyword').first()).toBeVisible();
-  const shell = box.at(2, 2);
+  const shell = box.at(2, 3);
   await page.keyboard.down('Shift');
   await page.mouse.click(shell.x, shell.y);
   await page.keyboard.up('Shift');
@@ -69,7 +69,7 @@ test('canvas multiselection, highlighted code, area selection, and measurement',
   await expect(page.locator('.details-tabs')).not.toContainText('Selection (');
   await page.mouse.move(box.x + box.label + 1, box.y + box.group + box.lane + 1);
   await page.mouse.down();
-  await page.mouse.move(box.at(30, 4).x, box.y + box.group + box.lane * 5 - 1, { steps: 8 });
+  await page.mouse.move(box.at(30, 5).x, box.y + box.group + box.lane * 6 - 1, { steps: 8 });
   await page.mouse.up();
   const selectionCount = await page.locator('.details-tabs').innerText();
   expect(Number(selectionCount.match(/Selection \((\d+)\)/)?.[1])).toBeGreaterThan(3);
@@ -123,7 +123,7 @@ test('F centers the selection at 80% width and hover shows only duration and nam
 }) => {
   await openExample(page);
   const box = await geometry(page);
-  const code = box.at(22, 4);
+  const code = box.at(22, 5);
   await page.mouse.move(code.x, code.y);
   await expect(page.getByRole('tooltip')).toHaveText('8.00 s functions.exec');
   await expect(page.getByRole('tooltip')).not.toContainText('complete');
@@ -189,7 +189,7 @@ test('flow visibility, linked navigation, agent scope, and turn filtering', asyn
   await expect(flows).toHaveAttribute('data-flow-mode', 'all');
   await expect(flows).toHaveAttribute('data-enabled-flow-count', String(allCount));
   const box = await geometry(page);
-  const dispatch = box.at(8, 5);
+  const dispatch = box.at(8, 6);
   await page.mouse.click(dispatch.x, dispatch.y);
   await expect(page.locator('.span-detail-title')).toContainText('spawn_agent');
   await expect
@@ -271,7 +271,7 @@ test('selected instant operations have a visible outline and retain their failur
   );
   await openExample(page);
   const box = await geometry(page);
-  const shell = box.at(1.5, 2);
+  const shell = box.at(1.5, 3);
   await page.mouse.click(shell.x, shell.y);
   await expect(page.locator('.span-detail-title')).toContainText('error');
   const colors = await page.getByTestId('timeline-canvas').evaluate(
@@ -300,7 +300,7 @@ test('selected instant operations have a visible outline and retain their failur
       }
       return { red, white, selectionWidth: (selectionRight - selectionLeft + 1) / scale };
     },
-    { right: box.label + (1.5 / 108) * box.plot + 1, y: box.group + 2 * box.lane + box.lane / 2 },
+    { right: box.label + (1.5 / 108) * box.plot + 1, y: box.group + 3 * box.lane + box.lane / 2 },
   );
   expect(colors.red).toBeGreaterThan(10);
   expect(colors.white).toBeGreaterThan(2);
@@ -375,6 +375,15 @@ test('thousands of overlapping slices use a viewport-sized canvas and survive re
       ),
     )
     .toEqual(['Shell / terminal']);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const labels = (window as unknown as { timelineLabels: string[] }).timelineLabels;
+        const turns = labels.indexOf('Agent turns');
+        return labels.slice(turns, turns + 3);
+      }),
+    )
+    .toEqual(['Agent turns', 'Messages', 'Inference']);
   const before = await canvas.boundingBox();
   await page.locator('.timeline-viewport').evaluate((element) => {
     element.scrollTop = 20000;
@@ -418,4 +427,9 @@ test('focused canvas supports keyboard selection without a duplicate span list',
   await expect(page.locator('.details-tabs')).toContainText('Selection (1)');
   await page.keyboard.press('Escape');
   await expect(page.locator('.details-tabs')).not.toContainText('Selection (');
+  await expect(page.locator('.details-panel')).toHaveClass(/collapsed/);
+  expect((await page.locator('.details-panel').boundingBox())!.height).toBeLessThan(40);
+  await page.keyboard.press('Home');
+  await expect(page.locator('.details-panel')).not.toHaveClass(/collapsed/);
+  await expect(page.locator('.details-tabs')).toContainText('Selection (1)');
 });

@@ -470,3 +470,72 @@ frontend/deployment tests, TypeScript, ESLint, Prettier and Knip pass. The final
 checker also verifies all 10 live files. A fresh 85-file publication snapshot
 passed Gitleaks. Independent review found no code/security/bounds/cancellation
 issues; its sole bookkeeping note is resolved by closing the TASKS entry.
+
+## Missing turn completion and session diagnostics
+
+The reported trace contained a turn start without any completion
+or abort, followed by seven later turns and an overnight gap. `finish()` assigned
+every running turn the entire file's end time. Complementing that oversized
+turn with its own operations fabricated a 19-hour inference tail. A settings
+record immediately before the next turn was not evidence of work by the old turn.
+
+A synthetic regression failed before the fix: a five-second unfinished turn
+became 86,399 seconds after a later visit. The fix records per-turn activity in
+the existing end-time field, excludes settings/metadata as work evidence, and
+leaves unfinished superseded turns incomplete. It does not clamp duration or
+close every turn at the next start. That alternative would erase explicit
+overlap; a second regression preserves late completion of an earlier turn without
+clearing the newer active turn. No additional turn-state map was needed.
+
+Reparsing the authorized local source reduces turn four to 990.256 seconds and
+its longest inference span to 71.151 seconds. The compaction operations have
+explicit recorded start/end timestamps, ranging from 134.396 to 246.755 seconds;
+these are kept. The separately selected `Context compacted` marker is instant.
+Its large replacement-history strings had raised `hasMore` although the detail
+projection emitted no content. A first fix only checked whether any content was rendered. Independent review
+caught a mixed case: a small command plus an ignored 150 KB field still offered
+duplicate pages. The mixed-field regression failed against that guard. The
+streaming reader now records which JSON strings have another page, maps their
+retained offsets to JSON pointers, and only carries paging state through fields
+used by the detail projection. Ignored nested message fields are covered too.
+This metadata is built only for selected detail records with paged strings;
+normal indexing keeps its existing fast path and bounded buffers. Existing
+structured output, UTF-8 and surrogate-pair reconstruction tests still pass.
+
+The sidebar info dialog exposes copyable root/child IDs, parser version, source
+location, archive state, counts and Rust warnings. It uses the existing parsed
+model, never rescans the file or interprets records in React. The Local files /
+Rust + WASM footer and all of its CSS were removed. Messages now follow turns;
+the separate Agent communication track retains its stable engine key. C shares
+the critical-path toggle used by the header and respects dialog/input/modifier
+guards. Parser cache version advances to stream-9.
+
+The Chrome diagnostics test uses a clipboard write stub to verify the exact ID
+without reading or replacing the host clipboard. Background controls are inert
+while the native modal is open, so assertions inspect their hidden state rather
+than treating them as interactive controls. The initial regression also used an exact label-text lookup on a label wrapping
+a select; option text made that locator fail. Its retained trace identified the
+stalled select operation. The corrected test uses the combobox's accessible name
+and checks that C does not change the background until the dialog closes.
+
+Follow-up feedback makes selection clearing collapse the bottom dock. A single
+selection handler now updates both IDs and collapsed state for timeline clearing,
+agent/session navigation and turn selection. Selecting a span reopens details;
+Critical path, Statistics and Session Log tabs explicitly reopen their contents.
+The existing keyboard test covers Escape collapsing and Home reopening the dock.
+
+Validation: 64 frontend/deployment tests, 55 Rust tests, strict lint/format/type/
+unused-code gates, production build and native/WASM parity pass. Native loading
+benchmarks measured 160.0 MB/s metadata and 62.4 MB/s trace on the 10,000-pair
+synthetic workload. The Chrome suite's diagnostics select locator and the new
+track-order assertion were corrected from retained traces: the latter had counted
+the painted group chevron as a label. All four affected Chrome scenarios pass,
+including dense scrolling/resizing, modal identities/C, navigation and dock
+collapse/reopen. The other existing scenarios passed in the preceding suite;
+hosted CI reruns the complete suite on the publication commit.
+
+The final independent review found no remaining findings. Hosted PR validation
+passed all 21 Chrome scenarios without retries, both native-platform jobs, the
+55 Rust and 64 frontend/deployment tests, WASM parity and browser benchmarks.
+Publication proceeds through the existing gated main workflow; its deployment
+step verifies the exact tested static artifact at the production URL.

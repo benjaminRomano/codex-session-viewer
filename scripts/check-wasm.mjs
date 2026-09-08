@@ -597,3 +597,98 @@ for (const model of ['codex-auto-review', 'ordinary-model']) {
 console.log(
   'Native/WASM parity passed: parsing, streaming, nested critical paths, send/receive endpoints, full details, follow-up sources, diagnostics, opaque labels and task envelopes.',
 );
+
+// Synthetic reproduction of a missing completion followed by a later session
+// visit. The original report is identified locally by Session info, never copied.
+const interruptedInput = [
+  [0, 'session_meta', { id: 'interrupted-root' }],
+  [1000, 'event_msg', { type: 'task_started', turn_id: 'interrupted' }],
+  [5000, 'event_msg', { type: 'agent_message', message: 'Last recorded work' }],
+  [60_000, 'event_msg', { type: 'thread_settings_applied' }],
+  [86_400_000, 'event_msg', { type: 'task_started', turn_id: 'later' }],
+  [86_401_000, 'event_msg', { type: 'task_complete', turn_id: 'later' }],
+]
+  .map(([ms, type, payload]) =>
+    JSON.stringify({ timestamp: new Date(1788739200000 + ms).toISOString(), type, payload }),
+  )
+  .join('\n');
+const interrupted = JSON.parse(parse_session(interruptedInput));
+assert.deepEqual(interrupted, native(interruptedInput));
+assert.equal(interrupted.turns[0].endTime - interrupted.turns[0].startTime, 4000);
+assert.equal(interrupted.turns[0].status, 'incomplete');
+assert.ok(
+  interrupted.spans
+    .filter((span) => span.turnId === 'interrupted')
+    .every((span) => span.endTime <= interrupted.turns[0].endTime),
+);
+const compactedInput = JSON.stringify({
+  type: 'compacted',
+  timestamp: '2026-09-07T00:00:00Z',
+  payload: { replacement_history: [{ type: 'message', content: 'x'.repeat(150_000) }] },
+});
+const compactionSelector = JSON.stringify({ sourceLine: 1, pageSize: 65536 });
+const compactionDetail = new DetailParser(compactionSelector);
+compactionDetail.push(compactedInput);
+const compacted = JSON.parse(compactionDetail.finish());
+compactionDetail.free();
+assert.deepEqual(compacted, native(compactedInput, ['--details', compactionSelector]));
+assert.equal(compacted.hasMore, false);
+console.log('Missing-completion and opaque-compaction native/WASM regressions passed.');
+
+for (const payload of [
+  {
+    type: 'web_search_end',
+    query: 'synthetic',
+    action: { type: 'search' },
+    results: ['done'],
+    ignored: 'x'.repeat(150_000),
+  },
+  {
+    type: 'function_call',
+    name: 'exec_command',
+    arguments: '{"cmd":"true"}',
+    ignored: 'x'.repeat(150_000),
+  },
+  {
+    type: 'message',
+    role: 'assistant',
+    content: [{ type: 'output_text', text: 'done', ignored: 'x'.repeat(150_000) }],
+  },
+]) {
+  const input = JSON.stringify({ type: 'response_item', payload });
+  const parser = new DetailParser(compactionSelector);
+  parser.push(input);
+  const result = JSON.parse(parser.finish());
+  parser.free();
+  assert.deepEqual(result, native(input, ['--details', compactionSelector]));
+  assert.equal(result.hasMore, false);
+}
+console.log('Ignored-field detail paging native/WASM regressions passed.');
+
+const searchQuery = 'search 🦀 '.repeat(15000);
+const searchInput = JSON.stringify({
+  type: 'event_msg',
+  payload: {
+    type: 'web_search_end',
+    query: searchQuery,
+    action: { type: 'search' },
+    results: ['done'],
+  },
+});
+let searchOffset = 0;
+let reconstructedQuery = '';
+for (;;) {
+  const selector = JSON.stringify({ sourceLine: 1, pageSize: 65536, offset: searchOffset });
+  const parser = new DetailParser(selector);
+  parser.push(searchInput);
+  const page = JSON.parse(parser.finish());
+  parser.free();
+  assert.deepEqual(page, native(searchInput, ['--details', selector]));
+  reconstructedQuery += JSON.parse(page.args).query;
+  if (!page.hasMore) break;
+  searchOffset = page.nextOffset;
+  assert.ok(searchOffset < 300000);
+}
+assert.ok(searchOffset > 0);
+assert.equal(reconstructedQuery, searchQuery);
+console.log('Displayed web-search projection reconstructs across native/WASM pages.');

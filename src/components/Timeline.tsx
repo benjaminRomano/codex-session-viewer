@@ -26,6 +26,7 @@ export interface TimelineProps {
   criticalSegments?: CriticalSegmentRange[];
   measurement?: TimeRange | null;
   onInspectSession?: (id: string) => void;
+  onToggleCritical?: () => void;
   onMeasureChange?: (range: TimeRange | null) => void;
   highlightedId?: string;
   focusRequest?: { spanId: string; nonce: number };
@@ -170,6 +171,7 @@ export function Timeline({
   measurement,
   onInspectSession,
   onMeasureChange,
+  onToggleCritical,
   highlightedId,
   focusRequest,
 }: TimelineProps) {
@@ -590,6 +592,9 @@ export function Timeline({
       } else if (event.code === 'KeyM') {
         event.preventDefault();
         measureSelection();
+      } else if (event.code === 'KeyC' && !event.repeat) {
+        event.preventDefault();
+        onToggleCritical?.();
       } else if (event.code === 'KeyF') {
         event.preventDefault();
         fit();
@@ -605,7 +610,7 @@ export function Timeline({
     };
     document.addEventListener('keydown', keydown);
     return () => document.removeEventListener('keydown', keydown);
-  }, [navigateFlow, measureSelection, fit, onSelectionChange, setMeasurement]);
+  }, [navigateFlow, measureSelection, fit, onSelectionChange, setMeasurement, onToggleCritical]);
 
   const timeAt = useCallback(
     (x: number) => view.start + ((x - labelWidth) / plotWidth) * duration,
@@ -1141,6 +1146,9 @@ export function Timeline({
           </span>
           <span>
             <kbd>Shift</kbd> + drag pans
+          </span>
+          <span>
+            <kbd>C</kbd> toggle critical path
           </span>
           <span>
             <kbd>M</kbd> measure

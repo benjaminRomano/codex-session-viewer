@@ -121,3 +121,17 @@ in the repository’s Actions tab. Local results below are recorded separately.
 - [x] Publish, verify public asset delivery and exercise the deployed viewer in external Chrome: 10 matching assets, 4 agents/73 spans, virtual log and focus intact.
 - [x] Verify automatic GitHub deployment and document production URL, setup and recovery. Run 34181797562 passed both Rust platforms, all browser gates and deployment on retry. Its first publication exposed a short alias-propagation interval; all 10 public files subsequently matched the tested artifact. The earlier 4,000-entry scroll regression also passes Linux CI.
 - [x] Add and verify bounded production-HTML readiness handling: both entry routes converge before asset checks, with a 40-second readiness cap inside the 120-second deadline. All 64 frontend/deployment tests, strict quality gates, live verification and independent review pass.
+
+## Session timing and diagnostics follow-up
+
+- [x] Reproduce and fix missing-completion turns extending inference to file end; add native/WASM regression coverage and verify the reported local session.
+- [x] Check recorded compaction timing and remove empty detail pagination.
+- [x] Add sidebar session info with copyable identity, source metadata and parser diagnostics.
+- [x] Add C critical-path shortcut; move Messages directly below Agent turns and rename Agent communication.
+- [x] Remove the Local files only / Rust + WASM footer and unused styling.
+- [x] Document session-ID bug reports and synthetic regression workflow; pass local quality, parity, benchmark and Chrome gates.
+- [x] Complete final independent review and hosted PR validation: [PR #12](https://github.com/benjaminRomano/codex-session-viewer/pull/12), 21 Chrome scenarios, 55 Rust tests on both platforms, and 64 frontend/deployment tests.
+
+Release status is tracked by the PR merge and the [gated main publication workflow](https://github.com/benjaminRomano/codex-session-viewer/actions/workflows/ci.yml), which verifies deployed asset bytes before reporting success.
+
+- [x] Collapse the dock whenever selection clears; reopen details on span selection and preserve access to the other dock tabs.

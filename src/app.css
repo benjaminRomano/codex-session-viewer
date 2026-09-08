@@ -313,24 +313,6 @@ code {
   min-width: 13px;
   color: #8b98a4;
 }
-.sidebar-footer {
-  border-top: 1px solid #d8dde2;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  color: #7a8790;
-}
-.sidebar-footer > span:last-child {
-  margin-left: auto;
-}
-.local-dot {
-  display: block;
-  width: 5px;
-  height: 5px;
-  background: #78909c;
-  border-radius: 50%;
-}
 .main-panel {
   flex: 1;
   min-width: 0;
@@ -1060,9 +1042,6 @@ tbody tr.selected {
   flex: 1;
   background: #fff;
 }
-.sidebar-footer {
-  padding: 8px 11px;
-}
 /* Keep turn navigation reachable even when a trace has dozens of agents. */
 .scope-panel {
   display: flex;
@@ -1118,4 +1097,67 @@ tbody tr.selected {
   padding: 10px 0 0;
   font-size: 10px;
   color: #7b8b98;
+}
+
+.session-info {
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px;
+}
+.session-info h1 {
+  margin: 0 0 16px;
+}
+.session-info h2 {
+  font-size: 13px;
+  margin-top: 20px;
+}
+.session-info label {
+  display: block;
+  font-size: 12px;
+}
+.session-info-picker select {
+  display: block;
+  width: 100%;
+  margin: 5px 0 14px;
+}
+.session-info-identity {
+  display: flex;
+  gap: 6px;
+  margin-top: 5px;
+}
+.session-info-identity input {
+  flex: 1;
+  min-width: 0;
+  font: 11px monospace;
+  padding: 7px;
+}
+.session-info-identity button {
+  display: flex;
+  align-items: center;
+}
+.session-info-copy-status {
+  font-size: 11px;
+  min-height: 20px;
+  padding-top: 4px;
+}
+.session-info-fields {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 7px 10px;
+  font-size: 12px;
+}
+.session-info-fields dt {
+  color: #657583;
+}
+.session-info-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.session-info ul {
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.session-info li {
+  margin: 8px 0;
 }

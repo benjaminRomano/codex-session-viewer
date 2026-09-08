@@ -8,10 +8,12 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
+  Info,
 } from 'lucide-react';
 import type { ParsedSession, SessionEntry, Turn } from '../types';
 import { formatDuration } from '../lib/engine';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { SessionInfo } from './SessionInfo';
 export interface SidebarProps {
   entries: SessionEntry[];
   sessions: ParsedSession[];
@@ -69,6 +71,7 @@ export function descendantCounts(entries: SessionEntry[]) {
   );
 }
 export function Sidebar(p: SidebarProps) {
+  const [infoId, setInfoId] = useState('');
   const root = p.sessions.find((s) => s.metadata.id === p.rootId);
   const focused = p.sessions.find((s) => s.metadata.id === p.focusId) ?? root;
   const roots = topLevelSessions(p.entries);
@@ -196,6 +199,15 @@ export function Sidebar(p: SidebarProps) {
             <span>
               {p.sessions.length} agent{p.sessions.length !== 1 && 's'}
             </span>
+            {root && (
+              <button
+                className="icon-button"
+                aria-label="Session info"
+                onClick={() => setInfoId(p.rootId)}
+              >
+                <Info size={14} />
+              </button>
+            )}
             {p.busy && (
               <span>
                 <LoaderCircle size={12} className="spin" />
@@ -273,10 +285,14 @@ export function Sidebar(p: SidebarProps) {
           </div>
         </>
       )}
-      <div className="sidebar-footer">
-        <span className="local-dot" />
-        Local files only<span>Rust + WASM</span>
-      </div>
+      {root && infoId === p.rootId && (
+        <SessionInfo
+          sessions={p.sessions}
+          entries={p.entries}
+          rootId={p.rootId}
+          onClose={() => setInfoId('')}
+        />
+      )}
     </aside>
   );
 }

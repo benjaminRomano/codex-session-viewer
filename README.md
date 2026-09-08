@@ -62,6 +62,10 @@ reconnect when permission remains granted; the browser may require another click
 after a restart. Folder imports cache only the current selection because browsers
 do not expose their directory identity.
 
+Use the **Session info** button beside the agent count to copy a session ID and
+inspect parser diagnostics. Include that ID when reporting a timing or content
+problem; see the [regression workflow](docs/contributing.md#session-bug-reports-and-regressions).
+
 Select a thread to replace the session list with its agent tree and turn controls.
 **All sessions** closes the trace and returns to the list. Collapse the sidebar or
 resize/collapse the bottom dock for more timeline space. Descendants load
@@ -78,6 +82,7 @@ independently and automatically, including files in the archive.
 | Drag          | Select spans across tracks                                                       |
 | Shift + click | Add or remove a span                                                             |
 | F             | Center selected spans at 80% width; fit the current scope if nothing is selected |
+| C             | Toggle the critical path                                                         |
 | M             | Measure the selection or drag a measurement                                      |
 | >             | Toggle all communication links                                                   |
 | <             | Toggle links connected to selected spans                                         |

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual';
+import {
+  defaultRangeExtractor,
+  observeElementOffset,
+  useVirtualizer,
+  type Range,
+} from '@tanstack/react-virtual';
 import type { LogEntry, ParsedSession, Span } from '../types';
 import { formatDuration } from '../lib/engine';
 import { Bot, ChevronDown, ChevronRight, MessageSquare, Terminal, UserRound } from 'lucide-react';
@@ -231,6 +236,13 @@ function LogFeed({
     // Ref measurements can run during a React commit. Queue their render
     // updates instead of recursively flushing a half-updated virtual range.
     useFlushSync: false,
+    // The default idle debounce replays the last native scroll event's offset.
+    // Row measurements may already have compensated scrollTop before the next
+    // event arrives. Read that live offset so idle cannot undo compensation.
+    observeElementOffset: (instance, callback) =>
+      observeElementOffset(instance, (offset, isScrolling) =>
+        callback(isScrolling ? offset : (instance.scrollElement?.scrollTop ?? offset), isScrolling),
+      ),
   });
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
     const offset = (instance.scrollOffset ?? 0) + instance.scrollAdjustments;

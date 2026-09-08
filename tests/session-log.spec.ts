@@ -306,8 +306,19 @@ test('session log continuously virtualizes thousands of variable-height entries 
             const result = row
               ? { id: row.dataset.logId!, offset: row.getBoundingClientRect().top - viewport.top }
               : undefined;
+            // A large reflow can delay native scroll delivery past the idle
+            // timer. Withhold those notifications to reproduce that ordering
+            // deterministically while allowing size measurements to proceed.
+            element.setAttribute('data-hold-scroll', 'true');
+            const holdScroll = (event: Event) => {
+              if (element.hasAttribute('data-hold-scroll')) event.stopImmediatePropagation();
+              else element.removeEventListener('scroll', holdScroll, true);
+            };
+            element.addEventListener('scroll', holdScroll, true);
             element.closest<HTMLElement>('.session-log')!.style.maxWidth = '360px';
-            resolve(result);
+            setTimeout(() => {
+              resolve(result);
+            }, 500);
           },
           { once: true },
         );
@@ -317,6 +328,21 @@ test('session log continuously virtualizes thousands of variable-height entries 
   expect(anchor).toBeDefined();
   await settleScroll(page);
   const anchoredRow = page.locator(`.session-log-entry[data-log-id="${anchor!.id}"]`);
+  try {
+    // Check before releasing native events: otherwise their fresh offset can
+    // hide a stale idle callback's incorrect intermediate virtual range.
+    expect(await anchoredRow.count()).toBe(1);
+    const row = await anchoredRow.boundingBox();
+    const viewport = await scroll.boundingBox();
+    expect(row && viewport ? Math.abs(row.y - viewport.y - anchor!.offset) : Infinity).toBeLessThan(
+      80,
+    );
+  } finally {
+    await scroll.evaluate((element) => {
+      element.removeAttribute('data-hold-scroll');
+      element.dispatchEvent(new Event('scroll'));
+    });
+  }
   await expect(anchoredRow).toHaveCount(1);
   await expect
     .poll(async () => {

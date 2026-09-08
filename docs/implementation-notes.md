@@ -394,3 +394,45 @@ virtual log, and focused a log operation while retaining the other timeline
 spans and the Log tab. The production domain is publicly accessible with
 Vercel's original protection settings unchanged. Automatic publication is
 verified separately by the next main-push workflow.
+
+The first automatic Verify run (34180441903 on 0d21580) passed both Rust jobs,
+61 frontend/deployment tests and native/WASM parity, then failed the existing
+4,000-entry log resize test on both attempts. The captured reading anchor was
+unmounted after narrowing the feed during upward scrolling. The other 19 Chrome
+tests passed. App source and dependency versions were unchanged from the prior
+successful run, exposing a remaining timing-sensitive resize defect. Deployment
+was correctly skipped; the manually published, previously verified site remains
+online. This must be repaired rather than weakening the assertion or retry gate.
+
+The retained synthetic prompt's resize increased the virtual container from
+365,007 to 399,806 pixels, while scrollTop moved from 182,473 to 182,640 (only 167 px).
+The expected reading row 1987 (span 1939) was replaced by a range around row 1601
+for at least five seconds. The content height changed, but the corresponding
+scroll compensation was lost; this is stronger evidence than a missing locator
+alone. The package/deployment changes did not alter application source.
+
+A separate application-owned resize anchor was considered, but instrumentation
+identified a smaller cause in the existing observer: TanStack's scroll-idle
+debounce replays its cached last native offset. Resize compensation can already
+have moved the DOM/internal position before the browser delivers the next scroll
+event. Replaying the old offset resets the virtual range; a subsequent small
+measurement can overwrite the large compensation. A controlled local old-code
+run logged cached 182,473 versus actual 210,112 after 27,342 px of retained-row growth,
+then failed on the same span 1939 anchor as CI in 36.3 seconds. Temporarily holding
+native notifications through the assertion prevents accidental recovery from
+hiding this broken ordering. The regression retains the original mounted-row,
+80 px anchor, overlap, complete-payload and console-error checks.
+
+The final change adapts TanStack's offset observer only for idle notifications:
+it reads the live element scrollTop instead of replaying the cached event offset.
+Native scroll notifications and the library's subscription cleanup remain intact.
+This avoids a second application-owned anchor state machine. Existing direct DOM
+geometry updates, deferred measurement and above-fold policy remain necessary
+for the separate failures documented earlier.
+
+The strengthened external Chrome regression passed three consecutive runs with
+retries disabled (39.6 s, 44.3 s, 42.4 s), after the old code failed the same controlled
+ordering in 36.3 s. All original anchor, overlap, mounted-row, full-payload and
+console-error assertions remain. Strict frontend quality checks and all 61 tests
+pass. Independent focused review found no issues; Linux CI remains the final
+automatic publication check.

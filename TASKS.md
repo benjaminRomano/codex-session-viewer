@@ -119,4 +119,4 @@ in the repository’s Actions tab. Local results below are recorded separately.
 - [x] Add production CSP, caching, WASM MIME and real missing-asset 404s.
 - [x] Complete packaging/live-check tests, quality gates and independent review: 61 frontend/deployment tests, 49 Rust tests, no review findings.
 - [x] Publish, verify public asset delivery and exercise the deployed viewer in external Chrome: 10 matching assets, 4 agents/73 spans, virtual log and focus intact.
-- [ ] Verify automatic GitHub deployment and document production URL, setup and recovery.
+- [ ] Verify automatic GitHub deployment and document production URL, setup and recovery. First run correctly withheld deployment after the existing 4,000-entry log resize test failed both attempts. The stale scroll-idle replay is fixed; old/new evidence, three no-retry Chrome runs and independent review pass. Verify Linux CI before closing.

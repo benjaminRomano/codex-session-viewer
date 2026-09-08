@@ -473,7 +473,7 @@ issues; its sole bookkeeping note is resolved by closing the TASKS entry.
 
 ## Missing turn completion and session diagnostics
 
-The reported stretching-plan trace contained a turn start without any completion
+The reported trace contained a turn start without any completion
 or abort, followed by seven later turns and an overnight gap. `finish()` assigned
 every running turn the entire file's end time. Complementing that oversized
 turn with its own operations fabricated a 19-hour inference tail. A settings
@@ -533,3 +533,9 @@ the painted group chevron as a label. All four affected Chrome scenarios pass,
 including dense scrolling/resizing, modal identities/C, navigation and dock
 collapse/reopen. The other existing scenarios passed in the preceding suite;
 hosted CI reruns the complete suite on the publication commit.
+
+The final independent review found no remaining findings. Hosted PR validation
+passed all 21 Chrome scenarios without retries, both native-platform jobs, the
+55 Rust and 64 frontend/deployment tests, WASM parity and browser benchmarks.
+Publication proceeds through the existing gated main workflow; its deployment
+step verifies the exact tested static artifact at the production URL.

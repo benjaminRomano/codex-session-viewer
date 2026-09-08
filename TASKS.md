@@ -130,6 +130,8 @@ in the repository’s Actions tab. Local results below are recorded separately.
 - [x] Add C critical-path shortcut; move Messages directly below Agent turns and rename Agent communication.
 - [x] Remove the Local files only / Rust + WASM footer and unused styling.
 - [x] Document session-ID bug reports and synthetic regression workflow; pass local quality, parity, benchmark and Chrome gates.
-- [ ] Complete final review, create/merge the PR after CI, and verify production publication.
+- [x] Complete final independent review and hosted PR validation: [PR #12](https://github.com/benjaminRomano/codex-session-viewer/pull/12), 21 Chrome scenarios, 55 Rust tests on both platforms, and 64 frontend/deployment tests.
+
+Release status is tracked by the PR merge and the [gated main publication workflow](https://github.com/benjaminRomano/codex-session-viewer/actions/workflows/ci.yml), which verifies deployed asset bytes before reporting success.
 
 - [x] Collapse the dock whenever selection clears; reopen details on span selection and preserve access to the other dock tabs.

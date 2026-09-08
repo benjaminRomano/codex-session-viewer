@@ -1,0 +1,21 @@
+# Dependencies and local configuration
+/node_modules/
+.env*
+.DS_Store
+*.pem
+npm-debug.log*
+
+# Build outputs and generated WASM bindings
+/dist/
+/target/
+/src/wasm/
+
+# Test reports, benchmarks, browser profiles, and private local data
+/coverage/
+/output/
+/outputs/
+/work/
+/test-results/
+/playwright-report/
+*.bench.json
+/local-data/

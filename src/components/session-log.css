@@ -1,0 +1,224 @@
+.session-log {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: #333;
+  container-type: inline-size;
+}
+.details-content:has(> .session-log) {
+  overflow: hidden;
+}
+.session-log-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 4px 12px;
+  flex-shrink: 0;
+  color: #8a939b;
+  font-size: 10px;
+}
+.session-log-scroll {
+  overflow: auto;
+  overflow-anchor: none;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 12px;
+  scrollbar-gutter: stable;
+}
+.session-log-virtual-space {
+  position: relative;
+  width: 100%;
+}
+.session-log-virtual-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+.session-log-entry {
+  padding: 6px 0;
+  max-width: 1280px;
+}
+.session-log-entry.role-tool {
+  padding: 2px 0;
+}
+.session-log-entry.role-user {
+  padding-top: 10px;
+}
+.session-log-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 20px;
+}
+.session-log-focus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 1 260px;
+  max-width: 30%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font:
+    11px Arial,
+    sans-serif;
+}
+.session-log-focus:hover {
+  background: transparent;
+  color: #2667e7;
+}
+.session-log-focus svg {
+  flex-shrink: 0;
+  color: #7c8790;
+}
+.session-log-focus strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.role-tool .session-log-focus strong {
+  font-weight: 400;
+}
+.session-log-focus:focus-visible,
+.session-log-expand:focus-visible {
+  outline: 2px solid #2667e7;
+  outline-offset: 2px;
+}
+.session-log-phase,
+.session-log-source,
+.session-log-entry time,
+.session-log-duration {
+  font-size: 10px;
+  color: #929ba3;
+  white-space: nowrap;
+}
+.session-log-entry time {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+.session-log-source {
+  flex: 0 2 110px;
+  min-width: 0;
+  max-width: 16%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-log-phase,
+.session-log-duration {
+  flex: 0 0 auto;
+}
+.session-log-phase {
+  width: 28px;
+}
+.session-log-tool-preview {
+  flex: 1 1 0;
+  font:
+    10px ui-monospace,
+    SFMono-Regular,
+    monospace;
+  color: #859099;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.session-log-failure {
+  background: #ca2626;
+  color: #fff;
+  width: 12px;
+  height: 12px;
+  line-height: 11px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.session-log-message {
+  margin: 3px 0 0 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.45 Arial,
+    sans-serif;
+  color: #39444d;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+}
+.session-log-expand {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 14px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  color: #82909b;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.session-log-expand:hover {
+  color: #2667e7;
+  background: #eef3f7;
+}
+.session-log-contents {
+  margin: 4px 0 2px 20px;
+  min-width: 0;
+}
+.session-log-contents .span-detail {
+  padding: 0;
+  border: 0;
+  overflow: visible;
+}
+.session-log-contents .prompt-block {
+  font:
+    12px/1.5 Arial,
+    sans-serif;
+  margin: 0;
+  padding: 0;
+}
+.session-log-contents .code-block,
+.session-log-contents .output-block {
+  margin: 4px 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+@container (max-width: 700px) {
+  .session-log-tool-preview {
+    display: none;
+  }
+  .session-log-focus {
+    flex: 1 1 0;
+    max-width: none;
+  }
+}
+@container (max-width: 420px) {
+  .session-log-scroll {
+    padding: 0 6px;
+  }
+  .session-log-entry-heading {
+    gap: 4px;
+  }
+  .session-log-source {
+    max-width: 14%;
+  }
+}

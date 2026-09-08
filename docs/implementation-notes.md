@@ -339,3 +339,58 @@ passed. The full quality checks still pass: 49 Rust tests, 39 frontend tests,
 strict lint/format/unused-code checks and the production build.
 The separate log/timeline hover, selection and content-phase scenario also passed
 (38.3 s), and the independent final review found no remaining issue.
+
+## Vercel delivery and verified artifacts
+
+The later request adds a hosted website and automatic deployment to the earlier
+source-only publication scope. A separate `codex-session-viewer` Vercel project
+uses a dedicated production origin. The old manual Pages workflow is removed;
+the existing Verify workflow publishes only after both Rust platform jobs and
+the browser job pass, using the same-run static artifact. Pull requests have no
+deployment job or deployment credentials. Main runs are serialized and a final main-SHA check skips obsolete queued runs
+or retries, so an older run cannot publish after a newer run. The GitHub production environment also
+restricts deployment to main.
+
+The deployment wrapper stages outside the checkout, builds Vercel Output API v3
+configuration directly, and sends only prebuilt static output. This avoids a
+second remote build and any upload of ignored local corpus, reports or source.
+The packager validates the exact synthetic demo bytes, static filename allowlist,
+regular-file status and WASM magic. It refuses existing stages. Immutable cache
+headers match only existing hashed files, so missing assets do not receive a
+one-year cache policy. HTML revalidates and there is no SPA fallback.
+
+The live checker reads every file plus the root document, compares hashes and
+lengths to the tested artifact, validates MIME/security/cache headers, and probes
+a missing WASM URL for 404. It rejects redirects, including login pages. Network
+work has four workers, per-request deadlines, a total deadline and bounded retry
+for transient readiness failures. A failed smoke check marks the job failed;
+rollback remains explicit because production may already have been published.
+
+Setup findings: the project-create endpoint rejected `nodeVersion`, so creation
+uses only name and the static framework selection; no server runtime is needed.
+The default Vercel protection is standard protection, which keeps generated
+URLs authenticated while allowing the assigned production domain. Automatic
+approval review rejected disabling protection; that action was not performed.
+The implementation uses the production domain without changing those defaults.
+A one-year project-scoped deployment token was created and piped directly into
+GitHub's production secret, without writing or displaying its value. The existing
+local CLI authentication was used through the CLI, never read from its files.
+
+The HTTP verification tests also exposed a fixture cleanup problem under denied
+loopback binding: a listen promise without an error handler could hang setup.
+Fixture startup now rejects bind failures and teardown handles a server that
+never started. Tests must run with local-server permissions in this environment.
+
+Local verification passed strict TypeScript/ESLint/Prettier/Knip, 61 frontend and
+deployment tests, 49 Rust tests with fmt/Clippy, the production build and
+native/WASM parity. Dependency audit reported zero vulnerabilities. The exact
+85-file publication snapshot passed Gitleaks and the independent review's
+private-path/generated-file audit. Independent source review found no issues.
+
+The first production deployment used the artifact from successful Verify run 34178722895. All 10 public files matched its bytes and passed MIME/security/cache
+checks; the root document and missing-WASM 404 check passed. External Chrome
+loaded the synthetic four-agent/73-span trace through WASM, opened the 63-entry
+virtual log, and focused a log operation while retaining the other timeline
+spans and the Log tab. The production domain is publicly accessible with
+Vercel's original protection settings unchanged. Automatic publication is
+verified separately by the next main-push workflow.

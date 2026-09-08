@@ -1,5 +1,6 @@
 # Dependencies and local configuration
 /node_modules/
+.vercel/
 .env*
 .DS_Store
 *.pem

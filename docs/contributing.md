@@ -69,8 +69,7 @@ processes, suppress assertion failures or claim an interrupted run passed.
 
 ## CI and deployment
 
-`Verify` runs on pull requests, main pushes, manual dispatch and reusable workflow
-calls. Its Linux/macOS engine jobs run formatting, strict Clippy, native tests and
+`Verify` runs on pull requests, main pushes, manual dispatch. Its Linux/macOS engine jobs run formatting, strict Clippy, native tests and
 the synthetic parser benchmark. Its browser job builds WASM, checks dependencies,
 runs all frontend quality gates, verifies native/WASM parity, runs Chrome E2E and
 the browser benchmark, and retains verification reports and the static bundle.
@@ -81,8 +80,10 @@ Browser retries retain diagnostic evidence, but a flaky test still fails CI.
 Investigate its first failure rather than treating a successful retry as proof
 that the original behavior was correct.
 
-The manual Pages workflow calls the same verification workflow and downloads its
-successful static artifact. Deployment receives Pages/OIDC permissions only in
-the deploy job. It does not rebuild a different artifact after testing. Local
-checks do not establish that hosted CI or deployment ran; record that distinction
-in handoff notes.
+Successful main pushes and manual runs on main deploy the same-run static
+artifact to Vercel after both engine jobs and the browser job pass. Only that job
+receives project-scoped deployment credentials from the main-only production
+environment. The packager rejects unexpected files and validates synthetic demos;
+the live check compares every served file to the tested artifact. See
+[deployment.md](deployment.md) for setup and recovery. Local checks do not establish
+that hosted CI or deployment ran; record that distinction in handoff notes.

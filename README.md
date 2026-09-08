@@ -4,8 +4,8 @@ See where your Codex sessions spend time. Follow model activity, tool calls, wai
 and sub-agent communication on a Perfetto-style timeline, then jump into the
 corresponding conversation or code.
 
-The viewer runs locally. A Rust engine parses your existing JSONL rollouts in
-browser workers; React presents the trace. There is no session upload service,
+The viewer processes your files locally in your browser. A Rust engine parses your
+existing JSONL rollouts in browser workers; React presents the trace. There is no session upload service,
 account setup, or API key.
 
 ## What you can explore
@@ -26,6 +26,13 @@ account setup, or API key.
   Inspect critical-path operations directly beside the path table.
 - **Large histories.** Streaming WASM parsing, bounded worker concurrency, cached
   metadata and eager descendant loading keep indexing separate from interaction.
+
+## Open the viewer
+
+Use [codex-session-viewer.vercel.app](https://codex-session-viewer.vercel.app) in
+Chrome or Edge. No installation is needed. Choose **Explore example** to try a
+synthetic trace, or **Open folder** to read your local Codex sessions. Files stay
+in your browser; Vercel serves the application assets.
 
 ## Run locally
 
@@ -96,10 +103,10 @@ ESLint includes type-aware TypeScript and React hook rules. Prettier, Knip,
 rustfmt and strict Clippy are required locally and in CI. Use `npm run format`
 and `npm run format:rust` before submitting changes. CI verifies the Rust engine
 on Linux/macOS, exercises the browser against WASM, and publishes a static build
-artifact. Pages deployment is a separate, manual workflow using the verified
-artifact. For hosted use, browser storage is shared by the entire origin, not
-isolated by URL path. Other apps on the same GitHub Pages origin could access the
-saved cache and handles. Use localhost or a dedicated origin for private sessions.
+artifact. Successful main pushes automatically deploy that exact artifact to
+Vercel; pull requests only verify. See [deployment setup](docs/deployment.md) for
+credentials, manual publication and rollback. The hosted app has a dedicated
+origin. Its folder permissions and cache are separate from localhost.
 
 Real-data benchmarks are opt-in and report aggregate timings/counts:
 

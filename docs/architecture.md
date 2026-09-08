@@ -92,7 +92,7 @@ Rust's workspace lint policy forbids unsafe code, denies unused must-use results
 
 ## Delivery
 
-`npm run build` compiles Rust/WASM, type-checks TypeScript, and bundles a static site. CI builds and verifies on pull requests; generated static artifacts can be downloaded without publishing. A separate manually triggered Pages workflow is an opt-in deployment path. No local session data is included in build artifacts.
+`npm run build` compiles Rust/WASM, type-checks TypeScript, and bundles a static site. CI builds and verifies on pull requests. Successful main pushes deploy the same-run static artifact to a dedicated Vercel origin, after Rust and browser verification. The deploy job packages only the allowlisted static files into Vercel Build Output API v3 format, with production CSP/cache headers and no SPA fallback. It never sends the checkout or local session data to Vercel. The live check verifies artifact bytes, MIME types, headers and missing-asset 404s. See [deployment.md](deployment.md).
 
 ## Session Log and live builds
 
@@ -105,4 +105,9 @@ Remeasured rows entirely above the viewport preserve the reading anchor even
 during upward scrolling, including a retained expanded payload that rewraps when
 the dock narrows.
 
-Workers fetch the explicit bundled WASM URL and validate its binary header before initialization. A failed request is retried once and a rejected initialization can be retried later. Production builds preserve prior hashed assets in `dist/` so a page that was already open can still start its workers after a rebuild. Fresh CI checkouts produce clean artifacts; delete `dist/` only when no old local clients need it.
+Workers fetch the explicit bundled WASM URL and validate its binary header before initialization. A failed request is retried once and a rejected initialization can be retried later. Repeated local builds preserve prior hashed assets in `dist/` so a page that was already open can still start its workers after a rebuild. Fresh CI checkouts produce clean artifacts; delete `dist/` only when no old local clients need it.
+
+Each hosted deployment uses a fresh, verified CI artifact. Vercel does not copy old
+hashed files from earlier deployments into that artifact. An already-open hosted
+page that encounters a retired worker/WASM URL can use the existing reload action;
+HTML is revalidated and missing assets return 404 instead of the app document.

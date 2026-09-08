@@ -568,4 +568,6 @@ A clean npm 12 install, native TypeScript checks, type-aware lint, formatting,
 Knip, 64 frontend/deployment tests, strict Clippy/rustfmt, 55 Rust tests, the
 production build, and native/WASM contract checks pass. The synthetic Chrome
 loading benchmark passes with all four agents and zero loading errors. Full
-Chrome scenario verification and independent review are recorded in the PR.
+Chrome verification passed all 21 scenarios across the suite (20 passing) and
+the corrected readiness rerun (1 passing). Independent GPT-6 Astra medium review
+reported no actionable findings. CI results are recorded in the PR.

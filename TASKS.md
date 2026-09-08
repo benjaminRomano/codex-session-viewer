@@ -140,4 +140,4 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 
 - [x] Replace ESLint and Prettier with native, type-aware Oxlint and oxfmt while preserving existing rule coverage, formatting options, and generated/private-data ignores.
 - [x] Upgrade native TypeScript, frontend build/test tooling, WASM bindings/CLI, and pinned CI actions to current stable releases.
-- [ ] Validate static/unit/native checks, production build, native/WASM parity, and external Chrome scenarios before merging the tooling PR.
+- [x] Validate static/unit/native checks, production build, native/WASM parity, and external Chrome scenarios; all 21 Chrome scenarios passed across the suite and the corrected readiness rerun.

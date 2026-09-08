@@ -339,7 +339,7 @@ test('session info reports identities and diagnostics; C toggles only outside di
   await page.goto('/');
   await page.locator('input[type=file]').setInputFiles(directory);
   await page.getByRole('button', { name: /^Fixture root / }).click();
-  await expect(page.locator('.scope-toolbar')).toContainText('4 agents');
+  await expect(page.locator('.scope-toolbar')).toContainText('4 agents', { timeout: 30000 });
   await expect(page.locator('.sidebar-footer')).toHaveCount(0);
   const critical = page
     .locator('.trace-info')

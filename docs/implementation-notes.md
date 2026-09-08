@@ -539,3 +539,35 @@ passed all 21 Chrome scenarios without retries, both native-platform jobs, the
 55 Rust and 64 frontend/deployment tests, WASM parity and browser benchmarks.
 Publication proceeds through the existing gated main workflow; its deployment
 step verifies the exact tested static artifact at the production URL.
+
+## Native web tooling refresh
+
+The tooling-only refresh replaces ESLint/Prettier with Oxlint 1.82.0,
+oxlint-tsgolint 7.0.2001, and oxfmt 0.67.0. The Oxlint configuration explicitly
+preserves the prior JavaScript recommended, TypeScript recommended/type-aware,
+and React hook rules and file scopes. Two old rules (`no-dupe-args`, `no-octal`)
+are syntax errors in this ESM source tree and are enforced by the parser instead.
+A temporary negative probe confirmed hook ordering, hook dependencies, and
+unhandled promises still fail lint. Formatter options and private/generated
+ignores were migrated without reformatting application source.
+
+The native TypeScript compiler is now 7.0.2; Vitest is 5.0.0, Playwright 1.63.0,
+and the React Vite plugin 6.1.1. Vite 8.2.2, Knip 6.34.0 and Rust 1.98.1 were
+already current. Node 24.20.0 LTS and npm 12.0.2 are pinned for local setup/CI.
+WASM bindings and their required CLI advance together to 0.2.128, and CI actions
+use current immutable pins. Product dependencies and parser semantics are unchanged.
+
+Verification exposed a pre-existing native/WASM test-runner path bug: URL
+`pathname` contains `%20` for checkout paths with spaces. The runner now uses
+`fileURLToPath` before spawning the native executable. A Chrome readiness
+assertion also hit its five-second default while synthetic child agents were
+still loading under concurrent local work; it now uses the same bounded
+30-second loading allowance as neighboring graph checks.
+
+A clean npm 12 install, native TypeScript checks, type-aware lint, formatting,
+Knip, 64 frontend/deployment tests, strict Clippy/rustfmt, 55 Rust tests, the
+production build, and native/WASM contract checks pass. The synthetic Chrome
+loading benchmark passes with all four agents and zero loading errors. Full
+Chrome verification passed all 21 scenarios across the suite (20 passing) and
+the corrected readiness rerun (1 passing). Independent GPT-6 Astra medium review
+reported no actionable findings. CI results are recorded in the PR.

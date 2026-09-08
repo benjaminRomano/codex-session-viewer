@@ -36,13 +36,19 @@ in your browser; Vercel serves the application assets.
 
 ## Run locally
 
-You need **Node.js 24**, **Rust 1.98.1**, and **wasm-bindgen-cli 0.2.100**.
+The web toolchain uses native TypeScript 7, Vite 8/Oxc, Vitest 5, type-aware Oxlint,
+and oxfmt. `npm run lint` checks the existing TypeScript safety and React hook rules;
+`npm run format` applies the shared formatting defaults.
+
+You need **Node.js 24.20.0** (`nvm use`), **npm 12.0.2**, **Rust 1.98.1**, and **wasm-bindgen-cli 0.2.128**.
 
 ```sh
 git clone https://github.com/benjaminRomano/codex-session-viewer.git
 cd codex-session-viewer
+nvm install && nvm use
+npm install --global npm@12.0.2
 rustup toolchain install 1.98.1 --component rustfmt,clippy --target wasm32-unknown-unknown
-cargo +1.98.1 install wasm-bindgen-cli --version 0.2.100 --locked
+cargo +1.98.1 install wasm-bindgen-cli --version 0.2.128 --locked
 npm ci
 npm run build:wasm
 npm run dev
@@ -104,7 +110,7 @@ cargo bench --locked -p session-parser --bench loading
 npm run bench:browser
 ```
 
-ESLint includes type-aware TypeScript and React hook rules. Prettier, Knip,
+Oxlint includes type-aware TypeScript and React hook rules. oxfmt, Knip,
 rustfmt and strict Clippy are required locally and in CI. Use `npm run format`
 and `npm run format:rust` before submitting changes. CI verifies the Rust engine
 on Linux/macOS, exercises the browser against WASM, and publishes a static build

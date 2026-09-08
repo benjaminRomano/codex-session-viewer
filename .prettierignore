@@ -1,4 +1,0 @@
-# Generated bindings/artifacts also follow .gitignore.
-package-lock.json
-public/demo/*.jsonl
-docs/licenses/

@@ -539,3 +539,37 @@ passed all 21 Chrome scenarios without retries, both native-platform jobs, the
 55 Rust and 64 frontend/deployment tests, WASM parity and browser benchmarks.
 Publication proceeds through the existing gated main workflow; its deployment
 step verifies the exact tested static artifact at the production URL.
+
+### Relative message targets and spawn endpoints
+
+A reported main-agent send addressed `timeline`, while the loaded child's
+canonical path was `/root/timeline`. Analysis indexed IDs and full paths but
+never resolved relative task names, dropping the edge. Targets now resolve
+against the sending agent's path after checking exact IDs and canonical paths.
+Older root metadata can omit its path; only a parentless sender gets the `/root`
+fallback. Child senders with unknown paths are not guessed, and nested agents
+with the same task name stay in their own namespaces.
+
+Spawn arrows now terminate on the first new child turn at or after dispatch,
+not its inference span or inherited earlier turns. Without a recorded new turn,
+analysis leaves the spawn unlinked. Send arrows still terminate on the matching
+Agent message received span. Existing sender/call correlation and wait handling
+remain in place.
+
+Both native regressions failed before their respective fixes. A synthetic raw
+rollout pair exercises relative spawn/send targets through parsing and analysis
+in native and WASM builds. The Chrome flow navigation scenario additionally
+asserts that following a spawn selects Turn 1. Reparsing the authorized report's
+root and relevant children confirms the previously unlinked send reaches its
+received message and the reported spawn reaches the child's first turn. No real
+record bodies or identifiers are retained in fixtures or publication files.
+
+This changes derived analysis only, not parsing or indexed metadata. Rebuilt
+WASM recalculates the edges when a session opens, so metadata cache version stays
+unchanged and existing indexes do not require a full corpus rescan.
+
+Validation: 57 Rust tests, 64 frontend/deployment tests, lint/format/unused-code
+gates, production build and native/WASM parity pass. External Chrome verifies
+flow visibility and keyboard navigation to the child turn. Independent review
+found no blocking issues; its suggested resume/close endpoint coverage is now
+included in the regression. The changed-source secret scan found no leaks.

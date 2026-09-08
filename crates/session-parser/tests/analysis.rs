@@ -305,3 +305,102 @@ fn missing_child_and_zero_duration_do_not_fail() {
     assert_eq!(result.path.total, 100.0);
     assert!(result.flows.is_empty());
 }
+
+#[test]
+fn relative_send_targets_resolve_in_the_sending_agents_scope() {
+    let receive = |id: &str, owner: &str, sender: &str| {
+        let mut value = span(id, owner, "agent_messages", 22.0, 22.0);
+        value.name = "Agent message received".into();
+        value.target_agent_id = Some(sender.into());
+        value
+    };
+    let mut root = session(
+        "root-id",
+        vec![span("root-send", "root-id", "agent_messages", 20.0, 21.0)],
+    );
+    root.metadata.agent_path = None;
+    root.agent_operations
+        .push(op("root-send", "send", "timeline", 20.0));
+    let mut child = session(
+        "child-id",
+        vec![receive("child-receive", "child-id", "/root")],
+    );
+    child.metadata.agent_path = Some("/root/timeline".into());
+    child.metadata.parent_id = Some("root-id".into());
+    let mut branch = session(
+        "branch-id",
+        vec![span(
+            "branch-send",
+            "branch-id",
+            "agent_messages",
+            20.0,
+            21.0,
+        )],
+    );
+    branch.metadata.agent_path = Some("/root/branch".into());
+    branch.metadata.parent_id = Some("root-id".into());
+    branch
+        .agent_operations
+        .push(op("branch-send", "send", "timeline", 20.0));
+    let mut nested = session(
+        "nested-id",
+        vec![receive("nested-receive", "nested-id", "/root/branch")],
+    );
+    nested.metadata.agent_path = Some("/root/branch/timeline".into());
+    nested.metadata.parent_id = Some("branch-id".into());
+    let mut sessions = vec![root, child, branch, nested];
+    let flows = build_flows(&sessions, 0.0, 100.0);
+    assert_eq!(flows.len(), 2);
+    assert_eq!(
+        (&*flows[0].source_span_id, &*flows[0].target_span_id),
+        ("root-send", "child-receive")
+    );
+    assert_eq!(
+        (&*flows[1].source_span_id, &*flows[1].target_span_id),
+        ("branch-send", "nested-receive")
+    );
+    // Focused child subtrees still resolve from the sender's canonical path.
+    assert_eq!(
+        build_flows(&sessions[2..], 0.0, 100.0)[0].target_span_id,
+        "nested-receive"
+    );
+    // A child lacking its own path must not borrow the root's namespace.
+    sessions[2].metadata.agent_path = None;
+    assert!(build_flows(&sessions[2..], 0.0, 100.0).is_empty());
+    sessions[0].agent_operations[0].target_ids = vec!["missing".into()];
+    assert!(build_flows(&sessions, 0.0, 100.0).is_empty());
+}
+
+#[test]
+fn spawn_flows_land_on_the_first_new_turn_not_inference_or_inherited_history() {
+    let mut root = session(
+        "root",
+        vec![span("spawn", "root", "agent_dispatch", 20.0, 21.0)],
+    );
+    root.agent_operations
+        .push(op("spawn", "spawn", "child", 20.0));
+    let child = session(
+        "child",
+        vec![
+            span("inherited-turn", "child", "turns", 0.0, 30.0),
+            span("inference", "child", "inference", 22.0, 40.0),
+            span("later-turn", "child", "turns", 50.0, 60.0),
+            span("new-turn", "child", "turns", 22.0, 45.0),
+        ],
+    );
+    let mut sessions = vec![root, child];
+    let flows = build_flows(&sessions, 0.0, 100.0);
+    assert_eq!(flows.len(), 1);
+    assert_eq!(flows[0].target_span_id, "new-turn");
+    assert_eq!(flows[0].target_time, 22.0);
+    for kind in ["resume", "close"] {
+        sessions[0].agent_operations[0].kind = kind.into();
+        assert_eq!(
+            build_flows(&sessions, 0.0, 100.0)[0].target_span_id,
+            "inference"
+        );
+    }
+    sessions[0].agent_operations[0].kind = "spawn".into();
+    sessions[1].spans.retain(|span| span.track != "turns");
+    assert!(build_flows(&sessions, 0.0, 100.0).is_empty());
+}

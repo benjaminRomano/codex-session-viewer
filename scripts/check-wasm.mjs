@@ -457,6 +457,87 @@ assert.equal(
   graphAnalysis.flows.find((flow) => flow.kind === 'send').targetSpanId,
   'receive-message',
 );
+// Exercise raw relative tool targets through parsing and both analysis adapters.
+const flowRecord = (second, type, payload) =>
+  JSON.stringify({
+    timestamp: `2026-09-07T00:00:${String(second).padStart(2, '0')}Z`,
+    type,
+    payload,
+  });
+const relativeRootInput = [
+  flowRecord(0, 'session_meta', { id: 'relative-root' }),
+  flowRecord(1, 'response_item', {
+    type: 'function_call',
+    name: 'spawn_agent',
+    call_id: 'spawn-call',
+    arguments: JSON.stringify({ task_name: 'timeline', message: 'Synthetic task' }),
+  }),
+  flowRecord(2, 'response_item', {
+    type: 'function_call_output',
+    call_id: 'spawn-call',
+    output: '{}',
+  }),
+  flowRecord(3, 'response_item', {
+    type: 'function_call',
+    name: 'send_message',
+    call_id: 'send-call',
+    arguments: JSON.stringify({ target: 'timeline', message: 'Synthetic follow-up' }),
+  }),
+  flowRecord(4, 'response_item', {
+    type: 'function_call_output',
+    call_id: 'send-call',
+    output: '{}',
+  }),
+].join('\n');
+const relativeChildInput = [
+  flowRecord(1, 'session_meta', {
+    id: 'relative-child',
+    parent_thread_id: 'relative-root',
+    agent_path: '/root/timeline',
+  }),
+  flowRecord(2, 'event_msg', { type: 'task_started', turn_id: 'relative-turn' }),
+  flowRecord(4, 'response_item', {
+    type: 'agent_message',
+    author: '/root',
+    recipient: '/root/timeline',
+    content: [
+      {
+        type: 'input_text',
+        text: 'Message Type: MESSAGE\nTask name: /root/timeline\nSender: /root\nPayload:\nSynthetic follow-up',
+      },
+    ],
+  }),
+  flowRecord(5, 'event_msg', { type: 'task_complete', turn_id: 'relative-turn' }),
+].join('\n');
+const relativeSessions = [relativeRootInput, relativeChildInput].map((input) => {
+  const parsed = JSON.parse(parse_session(input));
+  assert.deepEqual(parsed, native(input));
+  return parsed;
+});
+const relativeJson = JSON.stringify(relativeSessions);
+const relativeStart = Date.parse('2026-09-07T00:00:00Z');
+const relativeAnalysis = JSON.parse(
+  analyze_sessions(relativeJson, 'relative-root', relativeStart, relativeStart + 6000),
+);
+assert.deepEqual(
+  relativeAnalysis,
+  native(relativeJson, [
+    '--analyze',
+    'relative-root',
+    String(relativeStart),
+    String(relativeStart + 6000),
+  ]),
+);
+assert.equal(relativeAnalysis.flows.length, 2);
+for (const [kind, track] of [
+  ['spawn', 'turns'],
+  ['send', 'agent_messages'],
+]) {
+  const flow = relativeAnalysis.flows.find((flow) => flow.kind === kind);
+  const endpoint = relativeSessions[1].spans.find((span) => span.id === flow.targetSpanId);
+  assert.equal(endpoint.track, track);
+  if (kind === 'send') assert.equal(endpoint.name, 'Agent message received');
+}
 for (const [message, timed_out, joins] of [
   ['Wait completed.', false, true],
   ['Wait timed out.', true, false],

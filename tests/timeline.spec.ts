@@ -223,6 +223,7 @@ test('flow visibility, linked navigation, agent scope, and turn filtering', asyn
   await expect(flows).toHaveAttribute('data-flow-mode', 'hidden');
   await page.keyboard.press(']');
   await expect(page.locator('.span-detail')).toContainText('Parser');
+  await expect(page.locator('.span-detail-title')).toContainText('Turn 1');
   await expect(flows).toHaveAttribute('data-flow-mode', 'selected');
   await expect(flows).toHaveAttribute('data-show-all-flows', 'false');
   await page.keyboard.press('[');

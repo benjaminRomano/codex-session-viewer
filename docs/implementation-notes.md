@@ -249,3 +249,20 @@ benchmark indexed four demo files with no errors, 1.703 s cold and 17 ms warm
 within the same upload selection, with all four descendants loaded. These local
 measurements include worker initialization and machine load; they are not fixed
 CI performance budgets. The full real-corpus baseline remains documented above.
+
+## Initial repository publication
+
+The initial source commit was pushed to `benjaminRomano/codex-session-viewer` on
+`main`. Publication included exactly 80 text files, with no real session data,
+local paths, screenshots, reports, generated WASM, build directories or browser
+profiles. Gitleaks 8.30.1 reported no leaks. The manual private-data pattern scan
+found only the documented transport-shaped fixture in two tests; decoding it
+verified sequential synthetic bytes 0–63, not an encrypted user payload. The
+staged file hashes matched the scanned snapshot. Both commit identities use the
+GitHub no-reply email instead of the configured personal address.
+
+The push starts the hosted verification workflow. Its status is distinct from
+the local checks recorded above and can be inspected in GitHub Actions. No draft
+PR, release or Pages deployment was created. The final local Chrome page was
+refreshed to the optimized build: selected-only flows, no toolbar or alert, and
+14 mounted entries for a real log containing more than 7,500 entries.

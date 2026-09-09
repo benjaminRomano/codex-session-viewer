@@ -162,6 +162,10 @@ Development references: [quality gates](docs/contributing.md),
 [current tasks](TASKS.md), [implementation history](docs/implementation-notes.md),
 [loader design](docs/loading.md), and [Perfetto ports](docs/perfetto-reference.md).
 
+## License
+
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
+
 Perfetto-derived colors and navigation retain Apache 2.0 attribution and the
 [upstream license](docs/licenses/Perfetto-LICENSE.txt). This is an independent
 viewer; it does not embed the complete Perfetto application.

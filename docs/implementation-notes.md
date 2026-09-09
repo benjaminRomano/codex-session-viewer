@@ -2,6 +2,19 @@
 
 This file records decisions and failed approaches so a later agent can resume from evidence rather than rediscovering the project. Read this together with the parser, loading, and Perfetto reference documents.
 
+## 2026-09-09: repository license
+
+Adopted Apache 2.0 at the repository root using the complete license text from
+`https://www.apache.org/licenses/LICENSE-2.0.txt`. The README links to `LICENSE`,
+and npm package and lockfile metadata now declare `Apache-2.0`, matching the
+existing Rust crate declaration. Existing Perfetto attribution and upstream
+license text remain intact. No runtime or parser semantics changed.
+
+Verification: `npm run check` passed (64 frontend/deployment, 59 Rust, and 10
+skill helper tests, plus all quality gates). `npm run build` regenerated WASM
+and built production assets; `bash scripts/test-wasm.sh` passed native/WASM
+parity. The focused external Chrome engine parity scenario also passed.
+
 ## 2026-09-07: initial implementation
 
 - The repository started empty. The user's requested source references were available locally: Codex commit `a51608398d53b6d23ed98b8287de415b35f1eea5` and Perfetto commit `f8a7eeaac8f34dba9ce29950716b6012cfee8da2`.

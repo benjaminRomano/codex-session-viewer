@@ -631,3 +631,13 @@ Publication verification: the combined check passes all 59 Rust, 64 frontend,
 and 10 helper tests plus lint, format, type, and unused-code gates. Independent
 review found no actionable issues, and the changed-file secret scan was clean.
 Prior production/WASM/Chrome evidence above covers the unchanged engine patch.
+
+Fresh-context trials used three randomly selected historical turns for diagnosis
+and feedback, then a fourth for a held-out check. The reports distinguished
+post-response gaps from execution time and preserved necessary implementation
+and visual verification. Manual review found repeated builds inside composite
+checks that the initial report missed, an estimate exceeding its cited interval,
+and excess scope/caveat prose. The skill now checks shared command stages, ties
+savings to supported bounds, puts numbered actions and savings first, and links
+directly to evidence. These are qualitative report improvements; no execution
+speedup is claimed. Real trial reports and source manifests remain local.

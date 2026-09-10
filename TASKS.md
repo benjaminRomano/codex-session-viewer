@@ -160,3 +160,4 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 - [x] Make the helper's synthetic tests portable and include them in local checks and CI; document skill usage.
 - [x] Complete independent review and prepare the draft PR for the skill and critical-path timing correction, based on the existing flow-fix branch.
 - [x] Require an estimated time-saving field on every recommendation, with scope, confidence, assumptions, and explicit handling of zero or unquantifiable savings.
+- [x] Evaluate randomly selected historical turns in four fresh Codex tasks; refine command-stage analysis, estimate bounds, source links, and recommendation-first report formatting.

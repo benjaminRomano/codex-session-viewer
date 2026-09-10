@@ -20,3 +20,5 @@ npm-debug.log*
 /playwright-report/
 *.bench.json
 /local-data/
+__pycache__/
+*.pyc

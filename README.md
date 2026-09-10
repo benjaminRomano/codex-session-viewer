@@ -71,6 +71,24 @@ Select a thread to replace the session list with its agent tree and turn control
 resize/collapse the bottom dock for more timeline space. Descendants load
 independently and automatically, including files in the archive.
 
+## Analyze session performance with Codex
+
+The [Codex Session Performance skill](skills/codex-session-performance/SKILL.md)
+guides Codex through the completion dependencies of a session or turn and produces
+concise P0/P1/P2 recommendations with an evidence timeline. It distinguishes failed
+attempts from useful regression checks, overlapping work from blocking time, and
+background process lifetime from actual waiting.
+
+Ask Codex to use that file directly, or copy `skills/codex-session-performance`
+into your Codex skills directory (`~/.codex/skills` by default) and invoke
+`$codex-session-performance`. Review any existing copy before replacing it.
+
+The optional Python 3 helper summarizes normalized session and analysis JSON;
+it does not parse raw rollouts or require this viewer. See its
+[evidence guide](skills/codex-session-performance/references/evidence.md) for input
+contracts and commands. `npm run check:skills` runs its synthetic tests and is
+included in `npm run check` and CI. Private analyses and traces stay local.
+
 ## Timeline controls
 
 | Input         | Action                                                                           |
@@ -143,6 +161,10 @@ agent descriptions, so treat an exported index as personal data.
 Development references: [quality gates](docs/contributing.md),
 [current tasks](TASKS.md), [implementation history](docs/implementation-notes.md),
 [loader design](docs/loading.md), and [Perfetto ports](docs/perfetto-reference.md).
+
+## License
+
+This project is licensed under the [Apache License, Version 2.0](LICENSE).
 
 Perfetto-derived colors and navigation retain Apache 2.0 attribution and the
 [upstream license](docs/licenses/Perfetto-LICENSE.txt). This is an independent

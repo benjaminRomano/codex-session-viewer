@@ -298,24 +298,39 @@ fn walk(
     if !visited.insert(session.metadata.id.clone()) {
         return Vec::new();
     }
+    let turns: HashMap<_, _> = session
+        .turns
+        .iter()
+        .map(|turn| (turn.id.as_str(), turn))
+        .collect();
+    let bounds = |span: &Span| {
+        let turn = span.turn_id.as_deref().and_then(|id| turns.get(id));
+        // A process may survive its launching turn. Its lifetime alone is not
+        // evidence that it blocks later turns; explicit later waits have their
+        // own spans. Keep the full lifetime in the timeline and statistics.
+        (
+            span.start_time
+                .max(start)
+                .max(turn.map_or(start, |turn| turn.start_time)),
+            span.end_time
+                .min(end)
+                .min(turn.map_or(end, |turn| turn.end_time)),
+        )
+    };
     let spans: Vec<&Span> = session
         .spans
         .iter()
         .filter(|span| {
-            !excluded(span)
-                && span.end_time > span.start_time
-                && span.end_time > start
-                && span.start_time < end
+            let (left, right) = bounds(span);
+            !excluded(span) && right > left
         })
         .collect();
     let mut events: Vec<(f64, bool, usize)> = spans
         .iter()
         .enumerate()
         .flat_map(|(i, span)| {
-            [
-                (span.start_time.max(start), true, i),
-                (span.end_time.min(end), false, i),
-            ]
+            let (left, right) = bounds(span);
+            [(left, true, i), (right, false, i)]
         })
         .collect();
     events.sort_by(|a, b| {

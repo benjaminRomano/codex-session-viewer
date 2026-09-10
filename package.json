@@ -1,6 +1,7 @@
 {
   "name": "codex-session-viewer",
   "version": "0.1.0",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +18,7 @@
     "test:e2e": "npm run build:wasm && bash scripts/rust-command.sh build --locked -p session-parser --bin session-parser && playwright test",
     "bench:browser": "node scripts/bench-browser.mjs",
     "bench:corpus": "bash scripts/rust-command.sh run --release -p session-parser --bin benchmark --",
-    "check": "npm run check:ts && npm run check:rust",
+    "check": "npm run check:ts && npm run check:rust && npm run check:skills",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix --max-warnings=0",
     "format": "prettier . --write",
@@ -28,7 +29,8 @@
     "format:rust:check": "bash scripts/rust-command.sh fmt --all --check",
     "check:ts": "npm run typecheck && npm run lint && npm run format:check && npm run check:unused && npm test",
     "check:rust": "npm run format:rust:check && npm run lint:rust && bash scripts/rust-command.sh test --locked --workspace",
-    "deploy:vercel": "node scripts/deploy-vercel.mjs"
+    "deploy:vercel": "node scripts/deploy-vercel.mjs",
+    "check:skills": "python3 -m unittest discover -s skills/codex-session-performance/tests -v"
   },
   "dependencies": {
     "@tanstack/react-virtual": "3.14.11",

@@ -2,6 +2,19 @@
 
 This file records decisions and failed approaches so a later agent can resume from evidence rather than rediscovering the project. Read this together with the parser, loading, and Perfetto reference documents.
 
+## 2026-09-09: repository license
+
+Adopted Apache 2.0 at the repository root using the complete license text from
+`https://www.apache.org/licenses/LICENSE-2.0.txt`. The README links to `LICENSE`,
+and npm package and lockfile metadata now declare `Apache-2.0`, matching the
+existing Rust crate declaration. Existing Perfetto attribution and upstream
+license text remain intact. No runtime or parser semantics changed.
+
+Verification: `npm run check` passed (64 frontend/deployment, 59 Rust, and 10
+skill helper tests, plus all quality gates). `npm run build` regenerated WASM
+and built production assets; `bash scripts/test-wasm.sh` passed native/WASM
+parity. The focused external Chrome engine parity scenario also passed.
+
 ## 2026-09-07: initial implementation
 
 - The repository started empty. The user's requested source references were available locally: Codex commit `a51608398d53b6d23ed98b8287de415b35f1eea5` and Perfetto commit `f8a7eeaac8f34dba9ce29950716b6012cfee8da2`.
@@ -573,3 +586,58 @@ gates, production build and native/WASM parity pass. External Chrome verifies
 flow visibility and keyboard navigation to the child turn. Independent review
 found no blocking issues; its suggested resume/close endpoint coverage is now
 included in the regression. The changed-source secret scan found no leaks.
+
+## Critical-path process lifetimes
+
+A local performance analysis found a preview server launched in an earlier turn
+claiming time on later turns' paths. Critical-path candidates now intersect their
+recorded owning turn as well as the requested scope. Full process lifetimes stay
+on the timeline and in work statistics; explicit polls in a later turn remain
+eligible there. Operations without available turn metadata keep the prior
+fallback. Synthetic tests cover all three cases and whole-session clipping.
+
+This changes derived analysis only; metadata and parsing are unchanged. Rebuild
+WASM without invalidating the metadata index. A server running inside its own
+turn can still require manual readiness/causality interpretation: the logs do
+not reliably encode when a service becomes nonblocking.
+
+Validation: all 59 Rust and 64 frontend/deployment tests, strict quality gates,
+production build, native/WASM parity, and the external Chrome flow/scope/critical-
+path scenario pass. Two local turn checks remove 506.206s and 165.878s of false
+server attribution while preserving full elapsed coverage. Real inputs remain
+outside fixtures. The first sandboxed frontend run failed to bind localhost
+(`listen EPERM`); the permitted localhost run passed without code changes.
+
+## Reusable performance analysis skill
+
+`skills/codex-session-performance` contains the distributable skill, optional
+evidence/reasoning references, and a Python standard-library helper for normalized
+exports. Rust retains ownership of rollout parsing and critical-path construction;
+the helper summarizes interval coverage and groups operation fragments without
+interpreting session payloads. Ten portable synthetic tests cover overlap,
+incomplete scopes, identity, descendant context, and exclusion of payload text.
+They run through `npm run check:skills`, the combined local check, and browser CI.
+
+The report contract favors a short diagnosis, actionable P0/P1/P2 bullets, and an
+ordered evidence timeline. It calls out semantic failures, background lifetimes,
+overlap, and unmeasured savings beside the affected claims. Private trial reports
+and real session inputs are not part of the package.
+
+Each recommendation includes an estimated saving with units, affected turn/session,
+confidence, and its main assumption. Zero parent savings and estimates that cannot
+yet be quantified remain explicit; overlapping opportunities are not summed.
+
+Publication verification: the combined check passes all 59 Rust, 64 frontend,
+and 10 helper tests plus lint, format, type, and unused-code gates. Independent
+review found no actionable issues, and the changed-file secret scan was clean.
+Prior production/WASM/Chrome evidence above covers the unchanged engine patch.
+
+Fresh-context trials used three randomly selected historical turns for diagnosis
+and feedback, then a fourth for a held-out check. The reports distinguished
+post-response gaps from execution time and preserved necessary implementation
+and visual verification. Manual review found repeated builds inside composite
+checks that the initial report missed, an estimate exceeding its cited interval,
+and excess scope/caveat prose. The skill now checks shared command stages, ties
+savings to supported bounds, puts numbered actions and savings first, and links
+directly to evidence. These are qualitative report improvements; no execution
+speedup is claimed. Real trial reports and source manifests remain local.

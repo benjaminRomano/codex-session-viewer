@@ -58,6 +58,56 @@ fn turn(id: &str, end: f64, status: &str) -> Turn {
 }
 
 #[test]
+fn background_process_does_not_block_a_later_turn_but_its_wait_does() {
+    let mut server = span("server", "root", "shell", 1.0, 100.0);
+    server.turn_id = Some("first".into());
+    let mut inference = span("thinking", "root", "inference", 20.0, 30.0);
+    inference.turn_id = Some("second".into());
+    let mut wait = span("explicit-poll", "root", "code", 24.0, 26.0);
+    wait.turn_id = Some("second".into());
+    let mut root = session("root", vec![server, inference, wait]);
+    let mut second = turn("second", 30.0, "complete");
+    second.start_time = 20.0;
+    root.turns = vec![turn("first", 10.0, "complete"), second];
+    let sessions = vec![root];
+    let result = analyze(&sessions, "root", 20.0, 30.0);
+    let ids: Vec<_> = result
+        .path
+        .segments
+        .iter()
+        .map(|s| s.span.id.as_str())
+        .collect();
+    assert_eq!(ids, vec!["thinking", "explicit-poll", "thinking"]);
+    assert_eq!(result.path.total, 10.0);
+    assert!(result
+        .statistics
+        .iter()
+        .any(|s| s.track == "shell" && s.total == 10.0));
+    let whole = critical_path(&sessions, "root", 0.0, 100.0);
+    assert_eq!(
+        whole
+            .segments
+            .iter()
+            .find(|s| s.span.id == "server")
+            .unwrap()
+            .end,
+        10.0
+    );
+    assert!(whole.segments.iter().all(|s| s.end <= 30.0));
+    assert_eq!(sessions[0].spans[0].end_time, 100.0);
+}
+
+#[test]
+fn path_keeps_operations_when_their_turn_metadata_is_unavailable() {
+    let mut command = span("legacy", "root", "shell", 1.0, 100.0);
+    command.turn_id = Some("unavailable".into());
+    let sessions = vec![session("root", vec![command])];
+    let result = critical_path(&sessions, "root", 20.0, 30.0);
+    assert_eq!(result.total, 10.0);
+    assert_eq!(result.segments[0].span.id, "legacy");
+}
+
+#[test]
 fn nested_wrappers_do_not_double_count_and_focus_clips() {
     let root = session(
         "root",

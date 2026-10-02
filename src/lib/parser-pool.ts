@@ -1,6 +1,6 @@
 import type { ParsedSession, SessionMetadata } from '../types';
 
-export const PARSER_VERSION = 'session-parser-v1-stream-10';
+export const PARSER_VERSION = 'session-parser-v1-stream-11';
 export interface ParseOptions {
   signal?: AbortSignal;
   onBytes?: (bytes: number) => void;

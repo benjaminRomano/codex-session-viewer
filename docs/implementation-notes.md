@@ -661,3 +661,8 @@ The full local browser rerun also exposed an existing asynchronous ruler asserti
 agent-count rendering could finish before the viewport duration updated. The test
 now waits for the exact expected duration with expect.poll, retaining the same
 8-second requirement rather than accepting an intermediate whole-session range.
+
+Leading desktop context envelopes can also share a physical user input with its
+actual request. Label selection strips only the known envelope and optional
+My request heading, keeping that record's complete prompt and source location.
+A regression covers the combined-record form as well as standalone context.

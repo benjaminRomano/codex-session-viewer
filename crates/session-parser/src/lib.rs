@@ -265,6 +265,25 @@ fn is_context_input(text: &str) -> bool {
     })
 }
 
+/// A desktop context envelope may share a physical input with the real request.
+/// Remove only known leading envelopes for labels, preserving the original prompt.
+fn request_body(mut text: &str) -> &str {
+    loop {
+        let close = if text.starts_with("<external_codex_apps_open_page>") {
+            "</external_codex_apps_open_page>"
+        } else if text.starts_with("<in-app-browser-context") {
+            "</in-app-browser-context>"
+        } else {
+            break;
+        };
+        let Some((_, rest)) = text.split_once(close) else {
+            return "";
+        };
+        text = rest.trim();
+    }
+    text.strip_prefix("## My request:").unwrap_or(text).trim()
+}
+
 /// Strip only the known transport envelope for concise labels. The stored
 /// prompt and selected source record remain complete and unchanged.
 fn brief_body(text: &str) -> &str {
@@ -1075,7 +1094,7 @@ impl Engine {
     }
     fn title(&mut self, text: &str) {
         let original = text;
-        let text = text.trim();
+        let text = request_body(text.trim());
         if text.is_empty() || is_context_input(text) {
             return;
         }

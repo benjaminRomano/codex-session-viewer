@@ -415,3 +415,22 @@ fn displayed_web_search_query_reconstructs_across_pages() {
     assert!(offset > 0);
     assert_eq!(reconstructed, query);
 }
+
+#[test]
+fn browser_context_and_request_in_one_record_keep_the_request_label_and_full_source() {
+    let request = "<in-app-browser-context source=\"ambient-ui-state\">Browser metadata</in-app-browser-context>\n\n## My request:\nImprove the session title";
+    let input = json!({"type":"session_meta","payload":{"id":"root"}}).to_string()
+        + "\n"
+        + &json!({"type":"event_msg","payload":{"type":"task_started","turn_id":"turn"}})
+            .to_string()
+        + "\n"
+        + &json!({"type":"event_msg","payload":{"type":"user_message","message":request}})
+            .to_string()
+        + "\n";
+    let parsed: Value = serde_json::from_str(&parse_session(&input)).unwrap();
+    assert_eq!(parsed["metadata"]["title"], "Improve the session title");
+    assert_eq!(parsed["turns"][0]["title"], "Improve the session title");
+    assert_eq!(parsed["turns"][0]["prompt"], request);
+    assert_eq!(parsed["turns"][0]["sourceLine"], 3);
+    assert_eq!(load(&input, json!({"sourceLine":3}))["prompt"], request);
+}

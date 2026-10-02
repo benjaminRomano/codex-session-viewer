@@ -102,6 +102,18 @@ async function readArtifact(inputDir) {
       throw new Error(`Missing hashed ${extension} asset.`);
     }
   }
+  // Nested document routes must resolve entry assets at the origin root.
+  // Byte-identical HTML alone cannot catch an app that requests /session/.../assets.
+  const document = files.get('index.html').toString('utf8');
+  const references = [
+    ...document.matchAll(/<(?:script|link)\b[^>]*\b(?:src|href)=["']([^"']+)["']/g),
+  ].map((match) => match[1]);
+  if (!references.length) throw new Error('Document is missing entry asset references.');
+  for (const reference of references) {
+    if (!reference.startsWith('/assets/') || !files.has(reference.slice(1))) {
+      throw new Error(`Document asset must use an existing root-absolute path: ${reference}`);
+    }
+  }
   return files;
 }
 

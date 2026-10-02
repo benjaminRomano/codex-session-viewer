@@ -608,3 +608,10 @@ deep-link scenarios, including saved OPFS directory restoration on reload,
 archived lookup, copied turn URLs, missing IDs and wrong-file rejection. The
 friction viewer's 13 SQLite/backend tests also pass and its occurrence link was
 verified in the localhost browser. Hosted CI/publication remain separate checks.
+
+The first live Chrome check found a production-only asset-base failure: Vite's
+existing `base: './'` emitted relative script/style paths, so deep documents
+returned correct HTML but requested assets below the session route and appeared
+blank. Development-server tests and byte-only document checks missed it. Use
+`base: '/'`; the artifact packager now rejects relative, external or missing
+entry references before any upload. Regression cases cover all four failures.

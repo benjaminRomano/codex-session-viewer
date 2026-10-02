@@ -154,4 +154,5 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 - [x] Copy links to the current session or turn. Show missing session, mismatched file and missing turn errors.
 - [x] Serve dedicated document routes in production while preserving missing-asset 404s.
 - [x] Complete local quality gates, production build, native/WASM parity and relevant external Chrome regression tests.
-- [ ] Confirm successful main CI and verified production publication.
+- [x] Confirm successful main CI and verified production publication: commit `2d30bed`, [Verify run 36991871587](https://github.com/benjaminRomano/codex-session-viewer/actions/runs/36991871587). Live hosted Chrome opened the synthetic Turn 1 without console errors.
+- [x] Click through a real local friction occurrence into the published viewer; verify the matching turn, permission restoration, full reload and clean console.

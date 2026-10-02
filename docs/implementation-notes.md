@@ -615,3 +615,18 @@ returned correct HTML but requested assets below the session route and appeared
 blank. Development-server tests and byte-only document checks missed it. Use
 `base: '/'`; the artifact packager now rejects relative, external or missing
 entry references before any upload. Regression cases cover all four failures.
+
+Publication confirmed: main commit `2d30bed` passed both native-platform jobs,
+78 frontend/deployment tests, WASM parity, the full hosted Chrome suite and browser
+benchmark. Run 36991871587 deployed and byte-verified all 10 static files plus
+root/session/turn entry routes, headers and missing-asset 404s. Live external
+Chrome on the hosted turn path opened only the synthetic rollout at Turn 1 with
+Copy turn link visible and no console warnings/errors. The browser extension's
+file helper was unavailable, so the native picker selected the checked-in fixture.
+
+Cross-repository end-to-end verification: clicked an actual occurrence's
+“View turn in Session Viewer” link from the local friction website. The new
+Chrome tab on the production host restored the previously authorized `.codex`
+folder, loaded the recorded session directly, and selected its matching Turn 10.
+A full reload restored the same turn. No browser warnings or errors were logged.
+Private rollout contents and local database files are excluded from the PR.

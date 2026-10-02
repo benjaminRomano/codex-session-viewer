@@ -8,11 +8,13 @@ import {
   Keyboard,
   LoaderCircle,
   Menu,
+  Link,
 } from 'lucide-react';
 import { Timeline } from './components/Timeline';
 import { Sidebar } from './components/Sidebar';
 import { SessionLog } from './components/SessionLog';
 import { SpanDetails, type LoadDetail } from './components/SpanDetails';
+import { readSessionLink, sessionPath, type SessionLink } from './lib/session-link';
 import { ParserPool } from './lib/parser-pool';
 import { SessionStore, type ScanProgress, type SessionGraph } from './lib/session-store';
 import { useEngineAnalysis, formatDuration } from './lib/engine';
@@ -33,6 +35,14 @@ const pool = new ParserPool();
 const services = { pool, store: new SessionStore(pool) };
 if (import.meta.hot) import.meta.hot.dispose(() => services.store.dispose());
 
+let requestedLink: SessionLink | undefined;
+let linkError = '';
+try {
+  requestedLink = readSessionLink(window.location.pathname);
+} catch (error) {
+  linkError = errorMessage(error);
+}
+
 function OpenDialog({
   onClose,
   onOpen,
@@ -40,6 +50,8 @@ function OpenDialog({
   onDemo,
   saved,
   onReconnect,
+  sessionLink,
+  onFile,
 }: {
   onClose: () => void;
   onOpen: () => void;
@@ -47,9 +59,12 @@ function OpenDialog({
   onDemo: () => void;
   saved: boolean;
   onReconnect: () => void;
+  sessionLink?: SessionLink;
+  onFile: (file: File) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const files = useRef<HTMLInputElement>(null);
+  const singleFile = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -74,7 +89,19 @@ function OpenDialog({
       <div className="dialog-icon">
         <FolderOpen size={28} />
       </div>
-      <h1>Open your Codex sessions</h1>
+      <h1>{sessionLink ? 'Open linked session' : 'Open your Codex sessions'}</h1>
+      {sessionLink && (
+        <p>
+          Session <code>{sessionLink.sessionId}</code>
+          {sessionLink.turnId && (
+            <>
+              {' '}
+              · Turn <code>{sessionLink.turnId}</code>
+            </>
+          )}
+          . Only this rollout file will be loaded.
+        </p>
+      )}
       <p>
         Choose your <code>~/.codex</code> folder. Sessions and archived sessions are read directly
         from your disk.
@@ -126,6 +153,26 @@ function OpenDialog({
           refreshes.
         </p>
       )}
+      {sessionLink && (
+        <>
+          <button
+            className="text-button fallback-button"
+            onClick={() => singleFile.current?.click()}
+          >
+            Choose individual rollout file
+          </button>
+          <input
+            ref={singleFile}
+            aria-label="Choose individual rollout file"
+            type="file"
+            accept=".jsonl"
+            hidden
+            onChange={(e) => {
+              if (e.target.files?.[0]) onFile(e.target.files[0]);
+            }}
+          />
+        </>
+      )}
       <input
         ref={files}
         type="file"
@@ -165,7 +212,8 @@ export default function App() {
   const [limit, setLimit] = useState(100);
   const [progress, setProgress] = useState<ScanProgress>();
   const [graph, setGraph] = useState<SessionGraph>();
-  const [error, setError] = useState('');
+  const [error, setError] = useState(linkError);
+  const [copyStatus, setCopyStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [demo, setDemo] = useState(false);
   const [measure, setMeasure] = useState<TimeRange | null>(null);
@@ -195,8 +243,64 @@ export default function App() {
   const loadAbort = useRef<AbortController | null>(null);
   const generation = useRef(0);
 
+  const loadLinkedSession = useCallback(async (handle?: FileSystemDirectoryHandle, file?: File) => {
+    if (!requestedLink) return;
+    scanAbort.current?.abort();
+    loadAbort.current?.abort();
+    const controller = new AbortController();
+    loadAbort.current = controller;
+    const current = ++generation.current;
+    setModal(false);
+    setDemo(false);
+    setBusy(true);
+    setError('');
+    setProgress(undefined);
+    setEntries([]);
+    setSessions([]);
+    setGraph(undefined);
+    setRootId('');
+    setFocusId('');
+    setTurnId('');
+    try {
+      const parsed = handle
+        ? await services.store.openSession(handle, requestedLink.sessionId, {
+            signal: controller.signal,
+          })
+        : await services.store.openSessionFile(file!, requestedLink.sessionId, {
+            signal: controller.signal,
+          });
+      if (controller.signal.aborted || generation.current !== current) return;
+      if (handle) setSaved(handle);
+      setEntries(services.store.sessions);
+      setSessions([parsed]);
+      setRootId(parsed.metadata.id);
+      setFocusId(parsed.metadata.id);
+      setSelectedIds([]);
+      setMeasure(null);
+      const target = requestedLink.turnId;
+      if (target && !parsed.turns.some((turn) => turn.id === target)) {
+        setError(`Turn ${target} was not found in this session. Showing the whole session.`);
+      } else setTurnId(target || '');
+    } catch (e) {
+      if (!controller.signal.aborted && generation.current === current) setError(errorMessage(e));
+    } finally {
+      if (generation.current === current) setBusy(false);
+    }
+  }, []);
+
   const scan = useCallback(
     async (handle?: FileSystemDirectoryHandle, files?: FileList, refresh = false) => {
+      if (requestedLink && !refresh) {
+        if (handle) await loadLinkedSession(handle);
+        else {
+          const file = Array.from(files || []).find((file) =>
+            file.name.toLowerCase().endsWith(`-${requestedLink.sessionId.toLowerCase()}.jsonl`),
+          );
+          if (file) await loadLinkedSession(undefined, file);
+          else setError(`Session ${requestedLink.sessionId} was not found in the selected folder.`);
+        }
+        return;
+      }
       scanAbort.current?.abort();
       loadAbort.current?.abort();
       generation.current++;
@@ -240,7 +344,7 @@ export default function App() {
         if (!controller.signal.aborted) setError(errorMessage(e));
       }
     },
-    [],
+    [loadLinkedSession],
   );
 
   useEffect(() => {
@@ -271,6 +375,7 @@ export default function App() {
   useEffect(() => {
     setHighlightedId(undefined);
     setSpanFocus(undefined);
+    setCopyStatus('');
   }, [rootId, focusId, turnId]);
   useEffect(() => {
     if (tab !== 'log') {
@@ -555,6 +660,25 @@ export default function App() {
         </div>
         <div className="header-actions">
           {demo && <span className="demo-label">Example trace</span>}
+          {!!focused && !demo && (
+            <button
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(
+                    new URL(
+                      sessionPath(focused.metadata.id, turnId || undefined),
+                      window.location.origin,
+                    ).href,
+                  )
+                  .then(
+                    () => setCopyStatus('Link copied'),
+                    () => setCopyStatus('Could not copy link'),
+                  );
+              }}
+            >
+              <Link size={16} /> {copyStatus || (turnId ? 'Copy turn link' : 'Copy session link')}
+            </button>
+          )}
           <button
             className="icon-button"
             aria-label="Keyboard shortcuts"
@@ -1017,6 +1141,8 @@ export default function App() {
           onOpen={() => void openDirectory()}
           onFiles={(files) => void scan(undefined, files)}
           onDemo={() => void loadDemo()}
+          sessionLink={requestedLink}
+          onFile={(file) => void loadLinkedSession(undefined, file)}
           saved={!!saved}
           onReconnect={() => void reconnect()}
         />

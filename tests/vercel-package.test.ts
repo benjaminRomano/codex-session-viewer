@@ -99,11 +99,21 @@ test('packages only byte-identical static assets with production Vercel headers 
   expect(immutableAssets.test('/assets/__missing__.wasm')).toBe(false);
   expect(immutableAssets.test('/assets/index-aB0_-123Xjs')).toBe(false);
   expect(immutableAssets.test('/assets/index-aB0_-123.js/extra')).toBe(false);
-  expect(config.routes.slice(3)).toEqual([
-    { src: '^/$', dest: '/index.html' },
-    { handle: 'filesystem' },
-    { src: '^/.*$', status: 404 },
-  ]);
+  expect(config.routes.slice(5)).toEqual([{ handle: 'filesystem' }, { src: '^/.*$', status: 404 }]);
+  const deep = config.routes[4];
+  expect(deep.dest).toBe('/index.html');
+  expect(deep.headers['Cache-Control']).toBe('no-cache');
+  const deepPattern = new RegExp(deep.src);
+  expect(deepPattern.test('/session/00000000-0000-4000-8000-000000000001')).toBe(true);
+  expect(deepPattern.test('/session/00000000-0000-4000-8000-000000000001/turn/test-turn')).toBe(
+    true,
+  );
+  for (const path of [
+    '/assets/missing.js',
+    '/session/nope',
+    '/session/00000000-0000-4000-8000-000000000001/turn/test/extra',
+  ])
+    expect(deepPattern.test(path)).toBe(false);
   expect(config.overrides['assets/session_parser_bg-ABCDEFGH.wasm']).toEqual({
     contentType: 'application/wasm',
   });

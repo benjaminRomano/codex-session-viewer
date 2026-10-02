@@ -584,3 +584,27 @@ loading benchmark passes with all four agents and zero loading errors. Full
 Chrome verification passed all 21 scenarios across the suite (20 passing) and
 the corrected readiness rerun (1 passing). Independent GPT-6 Astra medium review
 reported no actionable findings. CI results are recorded in the PR.
+
+## Individual rollout deep links
+
+Session and turn paths retain their target through directory permission and file
+selection. The separate SessionStore loader enumerates names only beneath active
+and archived session directories, stops at the matching rollout, and parses that
+file once. It does not read title indexes, credentials, other rollout contents or
+descendants. Individual-file fallback verifies the parsed session identity before
+showing it. Missing turns are explicitly reported and use whole-session scope.
+Filename discovery can still visit many directories; no full corpus is parsed.
+The normal library Refresh workflow remains available after this focused load.
+
+Vercel rewrites only the two supported deep path forms, with no general SPA
+fallback. The live artifact verifier checks these documents as well as assets.
+The checkout initially had stale node_modules (Oxc commands absent); restore the
+pinned Node/npm and lockfile dependencies before running checks.
+
+Local verification: all frontend gates and 74 unit/deployment tests, Rust fmt and
+strict Clippy/native tests, production WASM/web build and native/WASM parity pass.
+External Chrome passes the 11 affected loading/navigation tests and all three
+deep-link scenarios, including saved OPFS directory restoration on reload,
+archived lookup, copied turn URLs, missing IDs and wrong-file rejection. The
+friction viewer's 13 SQLite/backend tests also pass and its occurrence link was
+verified in the localhost browser. Hosted CI/publication remain separate checks.

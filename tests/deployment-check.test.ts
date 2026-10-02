@@ -13,6 +13,8 @@ const CSP =
 const JS = '/assets/app-abcdefgh.js';
 const CSS = '/assets/app-abcdefgh.css';
 const WASM = '/assets/engine-abcdefgh.wasm';
+const SESSION = '/session/00000000-0000-4000-8000-000000000001';
+const TURN = `${SESSION}/turn/test-turn`;
 const MISSING = '/assets/__missing__.wasm';
 interface Override {
   status?: number;
@@ -52,7 +54,7 @@ beforeEach(async () => {
     const count = (requests.get(name) ?? 0) + 1;
     requests.set(name, count);
     if (name.startsWith('/assets/') && staleIndexPaths.size) assetsRequestedBeforeReady.push(name);
-    const file = name === '/' ? '/index.html' : name;
+    const file = name === '/' || name === SESSION || name === TURN ? '/index.html' : name;
     const override = overrides.get(name);
     const mime: Record<string, string> = {
       '.js': 'text/javascript',
@@ -117,7 +119,7 @@ describe('static deployment verification', () => {
       bytes: Object.values(files).reduce((total, body) => total + body.length, 0),
     });
     expect([...requests.keys()].sort()).toEqual(
-      ['/', '/index.html', JS, CSS, WASM, MISSING].sort(),
+      ['/', '/index.html', SESSION, TURN, JS, CSS, WASM, MISSING].sort(),
     );
   });
 

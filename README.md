@@ -157,3 +157,16 @@ This project is licensed under the [Apache License, Version 2.0](LICENSE).
 Perfetto-derived colors and navigation retain Apache 2.0 attribution and the
 [upstream license](docs/licenses/Perfetto-LICENSE.txt). This is an independent
 viewer; it does not embed the complete Perfetto application.
+
+### Session and turn links
+
+Open `/session/<session-id>` or `/session/<session-id>/turn/<turn-id>` on the hosted
+viewer. **Copy session link** / **Copy turn link** shares the current scope. The
+recipient needs the matching local rollout and browser folder permission; a link
+does not transfer session data or grant access to files.
+
+The linked-session flow locates the rollout by filename inside `sessions/` or
+`archived_sessions/` and parses only that file. It skips the library index and
+descendants. Choose the individual rollout file when folder access is unavailable.
+A missing turn produces a notice and displays the whole session; an absent session
+or mismatched file produces an error. **Refresh** scans the library for normal browsing.

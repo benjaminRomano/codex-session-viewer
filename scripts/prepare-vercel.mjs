@@ -133,6 +133,11 @@ function configuration(files) {
         continue: true,
       },
       { src: '^/$', dest: '/index.html' },
+      {
+        src: '^/session/[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}(?:/turn/[A-Za-z0-9_-]{1,128})?/?$',
+        headers: { 'Cache-Control': 'no-cache' },
+        dest: '/index.html',
+      },
       { handle: 'filesystem' },
       { src: '^/.*$', status: 404 },
     ],

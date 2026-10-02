@@ -146,3 +146,13 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 - [x] Replace ESLint and Prettier with native, type-aware Oxlint and oxfmt while preserving existing rule coverage, formatting options, and generated/private-data ignores.
 - [x] Upgrade native TypeScript, frontend build/test tooling, WASM bindings/CLI, and pinned CI actions to current stable releases.
 - [x] Validate static/unit/native checks, production build, native/WASM parity, and external Chrome scenarios; all 21 Chrome scenarios passed across the suite and the corrected readiness rerun.
+
+## Session and turn deep links
+
+- [x] Load `/session/<session-id>` and `/session/<session-id>/turn/<turn-id>` after folder access or individual file selection. Preserve the target through permission and reload flows.
+- [x] Dedicated loader finds a matching rollout in active/archived folders and parses only that file, without indexing other files or loading descendants.
+- [x] Copy links to the current session or turn. Show missing session, mismatched file and missing turn errors.
+- [x] Serve dedicated document routes in production while preserving missing-asset 404s.
+- [x] Complete local quality gates, production build, native/WASM parity and relevant external Chrome regression tests.
+- [x] Confirm successful main CI and verified production publication: commit `2d30bed`, [Verify run 36991871587](https://github.com/benjaminRomano/codex-session-viewer/actions/runs/36991871587). Live hosted Chrome opened the synthetic Turn 1 without console errors.
+- [x] Click through a real local friction occurrence into the published viewer; verify the matching turn, permission restoration, full reload and clean console.

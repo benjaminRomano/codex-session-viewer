@@ -584,3 +584,49 @@ loading benchmark passes with all four agents and zero loading errors. Full
 Chrome verification passed all 21 scenarios across the suite (20 passing) and
 the corrected readiness rerun (1 passing). Independent GPT-6 Astra medium review
 reported no actionable findings. CI results are recorded in the PR.
+
+## Individual rollout deep links
+
+Session and turn paths retain their target through directory permission and file
+selection. The separate SessionStore loader enumerates names only beneath active
+and archived session directories, stops at the matching rollout, and parses that
+file once. It does not read title indexes, credentials, other rollout contents or
+descendants. Individual-file fallback verifies the parsed session identity before
+showing it. Missing turns are explicitly reported and use whole-session scope.
+Filename discovery can still visit many directories; no full corpus is parsed.
+The normal library Refresh workflow remains available after this focused load.
+
+Vercel rewrites only the two supported deep path forms, with no general SPA
+fallback. The live artifact verifier checks these documents as well as assets.
+The checkout initially had stale node_modules (Oxc commands absent); restore the
+pinned Node/npm and lockfile dependencies before running checks.
+
+Local verification: all frontend gates and 74 unit/deployment tests, Rust fmt and
+strict Clippy/native tests, production WASM/web build and native/WASM parity pass.
+External Chrome passes the 11 affected loading/navigation tests and all three
+deep-link scenarios, including saved OPFS directory restoration on reload,
+archived lookup, copied turn URLs, missing IDs and wrong-file rejection. The
+friction viewer's 13 SQLite/backend tests also pass and its occurrence link was
+verified in the localhost browser. Hosted CI/publication remain separate checks.
+
+The first live Chrome check found a production-only asset-base failure: Vite's
+existing `base: './'` emitted relative script/style paths, so deep documents
+returned correct HTML but requested assets below the session route and appeared
+blank. Development-server tests and byte-only document checks missed it. Use
+`base: '/'`; the artifact packager now rejects relative, external or missing
+entry references before any upload. Regression cases cover all four failures.
+
+Publication confirmed: main commit `2d30bed` passed both native-platform jobs,
+78 frontend/deployment tests, WASM parity, the full hosted Chrome suite and browser
+benchmark. Run 36991871587 deployed and byte-verified all 10 static files plus
+root/session/turn entry routes, headers and missing-asset 404s. Live external
+Chrome on the hosted turn path opened only the synthetic rollout at Turn 1 with
+Copy turn link visible and no console warnings/errors. The browser extension's
+file helper was unavailable, so the native picker selected the checked-in fixture.
+
+Cross-repository end-to-end verification: clicked an actual occurrence's
+“View turn in Session Viewer” link from the local friction website. The new
+Chrome tab on the production host restored the previously authorized `.codex`
+folder, loaded the recorded session directly, and selected its matching Turn 10.
+A full reload restored the same turn. No browser warnings or errors were logged.
+Private rollout contents and local database files are excluded from the PR.

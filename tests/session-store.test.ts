@@ -572,3 +572,91 @@ it('bounded mapping stops admitting queued work after cancellation', async () =>
   await expect(task).rejects.toMatchObject({ name: 'AbortError' });
   expect(started).toEqual([0]);
 });
+
+describe('individual-session loading', () => {
+  const id = '00000000-0000-4000-8000-000000000001';
+  it.each(['sessions', 'archived_sessions'])(
+    'reads only the matching %s rollout, without metadata scans or descendants',
+    async (scope) => {
+      const unrelatedRead = vi.fn(() =>
+        Promise.reject(new Error('Unrelated contents must not be read')),
+      );
+      const selectedRead = vi.fn(async () => rollout(metadata(id, ['child'])));
+      const scoped = {
+        async *values() {
+          yield { kind: 'file', name: 'auth.json', getFile: unrelatedRead };
+          yield { kind: 'file', name: 'rollout-2026-10-02-other.jsonl', getFile: unrelatedRead };
+          yield { kind: 'file', name: `rollout-2026-10-02-${id}.jsonl`, getFile: selectedRead };
+        },
+      };
+      const handle = {
+        isSameEntry: async () => false,
+        getDirectoryHandle: async (name: string) => {
+          if (name === scope)
+            return {
+              async *values() {
+                yield { kind: 'directory', name: '2026', ...scoped };
+              },
+            };
+          throw new DOMException('Missing', 'NotFoundError');
+        },
+        getFileHandle: unrelatedRead,
+      } as unknown as FileSystemDirectoryHandle;
+      const parser = new TestParser();
+      const store = new SessionStore(parser);
+      const result = await store.openSession(handle, id);
+      expect(result.metadata.id).toBe(id);
+      expect(store.sessions).toHaveLength(1);
+      expect(parser.scans).toBe(0);
+      expect(parser.parsed).toEqual([id]);
+      expect(unrelatedRead).not.toHaveBeenCalled();
+      expect(selectedRead).toHaveBeenCalledOnce();
+    },
+  );
+  it('retries a changed native snapshot once without indexing the library', async () => {
+    let reads = 0;
+    const old = rollout(metadata(id), 1);
+    const fresh = rollout({ ...metadata(id), turnCount: 2 }, 2);
+    const handle = {
+      isSameEntry: async () => false,
+      getDirectoryHandle: async () => ({
+        async *values() {
+          yield {
+            kind: 'file',
+            name: `rollout-2026-${id}.jsonl`,
+            getFile: async () => (++reads === 1 ? old : fresh),
+          };
+        },
+      }),
+    } as unknown as FileSystemDirectoryHandle;
+    const parser = new TestParser();
+    const parse = parser.parseSession.bind(parser);
+    parser.parseSession = async (file, options) => {
+      if (file.lastModified === 1) throw new DOMException('File changed', 'NotReadableError');
+      return parse(file, options);
+    };
+    expect((await new SessionStore(parser).openSession(handle, id)).metadata.turnCount).toBe(2);
+    expect(reads).toBe(2);
+    expect(parser.scans).toBe(0);
+  });
+  it('rejects a mismatched individual file and leaves no selectable entry', async () => {
+    const store = new SessionStore(new TestParser());
+    await expect(store.openSessionFile(rollout(metadata('other')), id)).rejects.toThrow('not');
+    expect(store.sessions).toEqual([]);
+  });
+  it('does not substitute an unrelated session for a missing target', async () => {
+    const read = vi.fn();
+    const handle = {
+      isSameEntry: async () => false,
+      getDirectoryHandle: async () => ({
+        async *values() {
+          yield { kind: 'file', name: 'other.jsonl', getFile: read };
+        },
+      }),
+    } as unknown as FileSystemDirectoryHandle;
+    await expect(new SessionStore(new TestParser()).openSession(handle, id)).rejects.toThrow(
+      'not found',
+    );
+    expect(read).not.toHaveBeenCalled();
+  });
+});

@@ -248,7 +248,15 @@ export class SessionStore {
     handle: FileSystemDirectoryHandle,
     options: ScanOptions = {},
   ): Promise<SessionIndex> {
-    check(options.signal);
+    await this.prepareDirectory(handle, options.signal);
+    return this.scan(options);
+  }
+
+  private async prepareDirectory(
+    handle: FileSystemDirectoryHandle,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    check(signal);
     this.cancel();
     this.directory = handle;
     this.source = 'directory';
@@ -265,7 +273,111 @@ export class SessionStore {
     }
     this.folderId = same && saved ? saved.id : crypto.randomUUID();
     await this.saveDirectory({ id: this.folderId, handle });
-    return this.scan(options);
+  }
+
+  /** A deep link reads one rollout, without a library scan or descendant loading. */
+  async openSession(
+    handle: FileSystemDirectoryHandle,
+    id: string,
+    options: ParseOptions = {},
+  ): Promise<ParsedSession> {
+    await this.prepareDirectory(handle, options.signal);
+    let ref: FileRef | undefined;
+    for (const scope of ['sessions', 'archived_sessions']) {
+      check(options.signal);
+      try {
+        ref = await this.findRollout(
+          await handle.getDirectoryHandle(scope),
+          scope,
+          id,
+          options.signal,
+        );
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error;
+      }
+      if (ref) break;
+    }
+    if (!ref)
+      throw new Error(
+        `Session ${id} was not found in sessions or archived_sessions. Choose the .codex folder containing this session.`,
+      );
+    return this.openSessionRef(ref, id, options);
+  }
+
+  async openSessionFile(
+    file: File,
+    id: string,
+    options: ParseOptions = {},
+  ): Promise<ParsedSession> {
+    check(options.signal);
+    this.cancel();
+    this.directory = undefined;
+    this.source = 'files';
+    this.folderId = `upload:${crypto.randomUUID()}`;
+    this.uploadCache = { entries: {}, touched: Date.now() };
+    this.refs.clear();
+    this.entries.clear();
+    this.titles.clear();
+    return this.openSessionRef(
+      { path: file.name, getFile: () => Promise.resolve(file) },
+      id,
+      options,
+    );
+  }
+
+  private async openSessionRef(
+    ref: FileRef,
+    id: string,
+    options: ParseOptions,
+  ): Promise<ParsedSession> {
+    let file = await ref.getFile();
+    check(options.signal);
+    let session: ParsedSession;
+    try {
+      session = await this.parser.parseSession(file, options);
+    } catch (error) {
+      if (isAbort(error) || !this.directory) throw error;
+      const fresh = await ref.getFile();
+      check(options.signal);
+      if (
+        fresh.size === file.size &&
+        fresh.lastModified === file.lastModified &&
+        !/NotReadableError|NotFoundError|file.*(?:read|found)/i.test(message(error))
+      )
+        throw error;
+      file = fresh;
+      session = await this.parser.parseSession(file, options);
+    }
+    check(options.signal);
+    if (session.metadata.id.toLowerCase() !== id.toLowerCase())
+      throw new Error(
+        `This file belongs to session ${session.metadata.id}, not ${id}. Choose the matching rollout file.`,
+      );
+    ref.file = file;
+    this.refs.set(ref.path, ref);
+    this.setEntry(session.metadata, ref.path, file);
+    return session;
+  }
+
+  private async findRollout(
+    handle: FileSystemDirectoryHandle,
+    path: string,
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<FileRef | undefined> {
+    for await (const child of (handle as Directory).values()) {
+      check(signal);
+      const childPath = `${path}/${child.name}`;
+      if (child.kind === 'directory') {
+        const found = await this.findRollout(child, childPath, id, signal);
+        if (found) return found;
+      } else if (
+        child.name.startsWith('rollout-') &&
+        child.name.toLowerCase().endsWith(`-${id.toLowerCase()}.jsonl`)
+      ) {
+        return { path: childPath, getFile: () => child.getFile() };
+      }
+    }
   }
 
   async openFiles(

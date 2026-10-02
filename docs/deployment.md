@@ -95,3 +95,7 @@ Fresh deployments do not retain all old hashed assets. If a long-open tab needs
 an asset from a retired build, the viewer reports the loading problem and offers
 reload. Reload fetches the current HTML. User session files remain on disk and
 the metadata cache stays associated with the stable production origin.
+
+Dedicated `/session/<UUID>` and `/session/<UUID>/turn/<turn-id>` paths serve the
+same verified document with revalidation headers. Other missing paths and assets
+remain 404s. Deployment verification checks both deep routes against the artifact.

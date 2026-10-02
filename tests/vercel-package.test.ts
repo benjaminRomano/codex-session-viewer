@@ -40,7 +40,7 @@ async function artifact() {
   await mkdir(path.join(input, 'assets'), { recursive: true });
   await cp(fixtureDirectory, path.join(input, 'demo'), { recursive: true });
   const files = {
-    'index.html': Buffer.from('<!doctype html><script src="./assets/index-aB0_-123.js"></script>'),
+    'index.html': Buffer.from('<!doctype html><script src="/assets/index-aB0_-123.js"></script>'),
     'assets/index-aB0_-123.js': Buffer.from('export const text = "Synthetic ☃ fixture";\n'),
     'assets/index-12345678.css': Buffer.from('body { color: #24292e; }\n'),
     'assets/session_parser_bg-ABCDEFGH.wasm': Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]),
@@ -99,11 +99,21 @@ test('packages only byte-identical static assets with production Vercel headers 
   expect(immutableAssets.test('/assets/__missing__.wasm')).toBe(false);
   expect(immutableAssets.test('/assets/index-aB0_-123Xjs')).toBe(false);
   expect(immutableAssets.test('/assets/index-aB0_-123.js/extra')).toBe(false);
-  expect(config.routes.slice(3)).toEqual([
-    { src: '^/$', dest: '/index.html' },
-    { handle: 'filesystem' },
-    { src: '^/.*$', status: 404 },
-  ]);
+  expect(config.routes.slice(5)).toEqual([{ handle: 'filesystem' }, { src: '^/.*$', status: 404 }]);
+  const deep = config.routes[4];
+  expect(deep.dest).toBe('/index.html');
+  expect(deep.headers['Cache-Control']).toBe('no-cache');
+  const deepPattern = new RegExp(deep.src);
+  expect(deepPattern.test('/session/00000000-0000-4000-8000-000000000001')).toBe(true);
+  expect(deepPattern.test('/session/00000000-0000-4000-8000-000000000001/turn/test-turn')).toBe(
+    true,
+  );
+  for (const path of [
+    '/assets/missing.js',
+    '/session/nope',
+    '/session/00000000-0000-4000-8000-000000000001/turn/test/extra',
+  ])
+    expect(deepPattern.test(path)).toBe(false);
   expect(config.overrides['assets/session_parser_bg-ABCDEFGH.wasm']).toEqual({
     contentType: 'application/wasm',
   });
@@ -172,4 +182,19 @@ test('refuses existing stages and overlapping input/output without deleting thei
   await expect(prepareVercel(input, path.join(input, 'stage'))).rejects.toThrow('must not overlap');
   await expect(prepareVercel(input, path.dirname(input))).rejects.toThrow('must not overlap');
   await expect(lstat(path.join(input, 'stage'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+test.each([
+  './assets/index-aB0_-123.js',
+  '/session/assets/index-aB0_-123.js',
+  'https://example.com/asset.js',
+  '/assets/missing.js',
+])('rejects document asset references that break nested routes: %s', async (reference) => {
+  const { input, output } = await artifact();
+  await writeFile(
+    path.join(input, 'index.html'),
+    `<!doctype html><script src="${reference}"></script>`,
+  );
+  await expect(prepareVercel(input, output)).rejects.toThrow('root-absolute path');
+  await expect(lstat(output)).rejects.toMatchObject({ code: 'ENOENT' });
 });

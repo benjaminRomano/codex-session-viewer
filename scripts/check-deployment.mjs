@@ -209,6 +209,10 @@ export async function checkDeployment(url, staticDir) {
       url: new URL(file.relative.split('/').map(encodeURIComponent).join('/'), base),
     })),
     { file: index, url: base },
+    ...[
+      'session/00000000-0000-4000-8000-000000000001',
+      'session/00000000-0000-4000-8000-000000000001/turn/test-turn',
+    ].map((route) => ({ file: index, url: new URL(route, base) })),
     {
       file: { relative: 'assets/__missing__.wasm' },
       url: new URL('assets/__missing__.wasm', base),

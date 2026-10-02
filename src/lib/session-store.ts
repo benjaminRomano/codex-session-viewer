@@ -301,6 +301,13 @@ export class SessionStore {
       throw new Error(
         `Session ${id} was not found in sessions or archived_sessions. Choose the .codex folder containing this session.`,
       );
+    try {
+      const index = await handle.getFileHandle('session_index.jsonl');
+      await this.readTitles(await index.getFile(), id, options.signal);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error;
+    }
+    check(options.signal);
     return this.openSessionRef(ref, id, options);
   }
 
@@ -353,6 +360,8 @@ export class SessionStore {
       throw new Error(
         `This file belongs to session ${session.metadata.id}, not ${id}. Choose the matching rollout file.`,
       );
+    const savedTitle = this.titles.get(id);
+    if (savedTitle) session.metadata.title = savedTitle;
     ref.file = file;
     this.refs.set(ref.path, ref);
     this.setEntry(session.metadata, ref.path, file);
@@ -871,21 +880,27 @@ export class SessionStore {
     }
   }
 
-  private async readTitles(file: File): Promise<void> {
+  private async readTitles(file: File, targetId?: string, signal?: AbortSignal): Promise<void> {
     const reader = file.stream().getReader();
     const decoder = new TextDecoder();
     let pending = '';
     const consume = (line: string) => {
       try {
         const record = JSON.parse(line) as { id?: unknown; thread_name?: unknown };
-        if (typeof record.id === 'string' && typeof record.thread_name === 'string')
-          this.titles.set(record.id, record.thread_name);
+        if (
+          typeof record.id === 'string' &&
+          typeof record.thread_name === 'string' &&
+          record.thread_name.trim() &&
+          (!targetId || record.id.toLowerCase() === targetId.toLowerCase())
+        )
+          this.titles.set(targetId ?? record.id, record.thread_name);
       } catch {
         /* A final partial row may be in flight while Codex appends. */
       }
     };
     try {
       while (true) {
+        check(signal);
         const { done, value } = await reader.read();
         if (done) break;
         pending += decoder.decode(value, { stream: true });

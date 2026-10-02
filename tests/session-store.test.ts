@@ -600,12 +600,29 @@ describe('individual-session loading', () => {
             };
           throw new DOMException('Missing', 'NotFoundError');
         },
-        getFileHandle: unrelatedRead,
+        getFileHandle: async (name: string) => {
+          expect(name).toBe('session_index.jsonl');
+          return {
+            getFile: async () =>
+              new File(
+                [
+                  JSON.stringify({ id: 'other', thread_name: 'Other session' }) +
+                    '\n' +
+                    JSON.stringify({ id, thread_name: 'Original title' }) +
+                    '\n' +
+                    JSON.stringify({ id, thread_name: 'Saved session title' }),
+                ],
+                name,
+              ),
+          };
+        },
       } as unknown as FileSystemDirectoryHandle;
       const parser = new TestParser();
       const store = new SessionStore(parser);
       const result = await store.openSession(handle, id);
       expect(result.metadata.id).toBe(id);
+      expect(result.metadata.title).toBe('Saved session title');
+      expect(store.sessions[0].title).toBe('Saved session title');
       expect(store.sessions).toHaveLength(1);
       expect(parser.scans).toBe(0);
       expect(parser.parsed).toEqual([id]);
@@ -619,6 +636,9 @@ describe('individual-session loading', () => {
     const fresh = rollout({ ...metadata(id), turnCount: 2 }, 2);
     const handle = {
       isSameEntry: async () => false,
+      getFileHandle: async () => {
+        throw new DOMException('Missing index', 'NotFoundError');
+      },
       getDirectoryHandle: async () => ({
         async *values() {
           yield {
@@ -648,6 +668,9 @@ describe('individual-session loading', () => {
     const read = vi.fn();
     const handle = {
       isSameEntry: async () => false,
+      getFileHandle: async () => {
+        throw new DOMException('Missing index', 'NotFoundError');
+      },
       getDirectoryHandle: async () => ({
         async *values() {
           yield { kind: 'file', name: 'other.jsonl', getFile: read };

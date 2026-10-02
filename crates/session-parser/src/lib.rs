@@ -239,6 +239,8 @@ fn record_output(v: &Value) -> Option<String> {
 /// Keep this list explicit: arbitrary XML can itself be a legitimate request.
 fn is_context_input(text: &str) -> bool {
     [
+        "<external_codex_apps_open_page>",
+        "<in-app-browser-context",
         "<recommended_plugins>",
         "<environment_context>",
         "<app-context>",

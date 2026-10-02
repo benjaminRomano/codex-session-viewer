@@ -156,3 +156,9 @@ Release status is tracked by the PR merge and the [gated main publication workfl
 - [x] Complete local quality gates, production build, native/WASM parity and relevant external Chrome regression tests.
 - [x] Confirm successful main CI and verified production publication: commit `2d30bed`, [Verify run 36991871587](https://github.com/benjaminRomano/codex-session-viewer/actions/runs/36991871587). Live hosted Chrome opened the synthetic Turn 1 without console errors.
 - [x] Click through a real local friction occurrence into the published viewer; verify the matching turn, permission restoration, full reload and clean console.
+
+## Session titles after page context and direct loading
+
+- [x] Ignore injected page/browser context when choosing session and turn request labels.
+- [x] Read the recorded title from session_index.jsonl for direct directory loads while parsing only the requested rollout.
+- [x] Verify parser source references, saved-title precedence, native/WASM parity and external Chrome reload coverage.

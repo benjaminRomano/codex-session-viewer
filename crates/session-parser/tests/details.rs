@@ -319,6 +319,8 @@ fn context_records_cannot_pin_the_actual_request_or_its_detail_source() {
     let records = [
         json!({"type":"session_meta","payload":{"id":"root"}}),
         json!({"type":"event_msg","payload":{"type":"task_started","turn_id":"turn"}}),
+        json!({"type":"event_msg","payload":{"type":"user_message","message":"<external_codex_apps_open_page>{\"page_id\":null}</external_codex_apps_open_page>"}}),
+        json!({"type":"event_msg","payload":{"type":"user_message","message":"<in-app-browser-context source=\"ambient-ui-state\">Browser context</in-app-browser-context>"}}),
         json!({"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<recommended_plugins>Available plugins</recommended_plugins>"}]}}),
         json!({"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>Local environment</environment_context>"}]}}),
         json!({"type":"event_msg","payload":{"type":"user_message","message":"# AGENTS.md instructions for /synthetic\n<INSTRUCTIONS>Project guidance</INSTRUCTIONS>"}}),
@@ -331,8 +333,12 @@ fn context_records_cannot_pin_the_actual_request_or_its_detail_source() {
         .map(|v| v.to_string() + "\n")
         .collect::<String>();
     let parsed: Value = serde_json::from_str(&parse_session(&input)).unwrap();
+    assert!(parsed["metadata"]["title"]
+        .as_str()
+        .unwrap()
+        .starts_with("I want you to review this code deeply."));
     assert_eq!(parsed["turns"][0]["prompt"], request);
-    assert_eq!(parsed["turns"][0]["sourceLine"], 7);
+    assert_eq!(parsed["turns"][0]["sourceLine"], 9);
     assert!(parsed["turns"][0]["title"]
         .as_str()
         .unwrap()
@@ -343,7 +349,7 @@ fn context_records_cannot_pin_the_actual_request_or_its_detail_source() {
         .iter()
         .find(|span| span["track"] == "turns")
         .unwrap();
-    assert_eq!(turn_span["sourceLine"], 7);
+    assert_eq!(turn_span["sourceLine"], 9);
     let details = load(&input, json!({"sourceLine":turn_span["sourceLine"]}));
     assert_eq!(details["prompt"], request);
 }

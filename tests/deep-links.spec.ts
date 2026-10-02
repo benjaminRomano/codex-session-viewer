@@ -7,7 +7,20 @@ const turn = `${id}-turn-1`;
 test('a linked turn survives folder selection and reload, reading only its file', async ({
   page,
 }) => {
-  const contents = await readFile('public/demo/demo-root.jsonl', 'utf8');
+  const lines = (await readFile('public/demo/demo-root.jsonl', 'utf8')).split('\n');
+  lines.splice(
+    2,
+    0,
+    JSON.stringify({
+      timestamp: '2026-09-07T20:00:00.001Z',
+      type: 'event_msg',
+      payload: {
+        type: 'user_message',
+        message: '<external_codex_apps_open_page>{"page_id":null}</external_codex_apps_open_page>',
+      },
+    }),
+  );
+  const contents = lines.join('\n');
   await page.addInitScript(
     ({ id, contents }) => {
       const state = window as unknown as {
@@ -40,6 +53,16 @@ test('a linked turn survives folder selection and reload, reading only its file'
       };
       state.showDirectoryPicker = async () => ({
         isSameEntry: async () => false,
+        getFileHandle: async (name: string) => {
+          if (name !== 'session_index.jsonl') throw new Error('Unexpected file');
+          return {
+            getFile: async () =>
+              new File(
+                [JSON.stringify({ id, thread_name: 'Saved synthetic session title' })],
+                name,
+              ),
+          };
+        },
         getDirectoryHandle: async (name: string) => {
           if (name === 'sessions') return scope;
           throw new DOMException('Missing', 'NotFoundError');
@@ -57,6 +80,8 @@ test('a linked turn survives folder selection and reload, reading only its file'
     timeout: 30_000,
   });
   await expect(page.locator('.error-banner')).toHaveCount(0);
+  await expect(page.locator('.header-title')).toHaveText('Saved synthetic session title');
+  await expect(page.getByRole('button', { name: /1 Build a session trace viewer/ })).toBeVisible();
   expect(
     await page.evaluate(() => ({
       selected: (window as unknown as { selectedReads: number }).selectedReads,
@@ -68,6 +93,8 @@ test('a linked turn survives folder selection and reload, reading only its file'
   await expect(page.getByRole('button', { name: 'Copy turn link' })).toBeVisible({
     timeout: 30_000,
   });
+  await expect(page.locator('.header-title')).toHaveText('Saved synthetic session title');
+  await page.screenshot({ path: 'output/session-title-deep-link.png' });
   expect(errors).toEqual([]);
 });
 

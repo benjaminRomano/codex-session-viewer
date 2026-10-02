@@ -630,3 +630,24 @@ Chrome tab on the production host restored the previously authorized `.codex`
 folder, loaded the recorded session directly, and selected its matching Turn 10.
 A full reload restored the same turn. No browser warnings or errors were logged.
 Private rollout contents and local database files are excluded from the PR.
+
+### Session titles on direct links
+
+Injected external_codex_apps_open_page records were incorrectly eligible as the
+first user request, pinning session/turn labels and source references to context.
+The parser now excludes that known context prefix and ambient browser-context
+records from request/title selection; arbitrary XML requests remain supported.
+Context-only turns keep the existing Turn N fallback, and raw records remain
+available in the session log. Parser metadata-cache version is incremented.
+
+Direct directory loading now streams the optional session_index.jsonl and retains
+only the requested session's latest nonempty recorded title. It applies that title
+to both the parsed session and list entry, without scanning other rollout contents
+or loading descendants. Individual-file loads still fall back to actual requests
+because they have no title index.
+
+Verification: all 78 frontend/deployment tests and Rust fmt/Clippy/tests passed;
+production build and native/WASM parity passed. All three external Chrome
+deep-link tests passed, including a synthetic injected page-context record, saved
+index title in header/sidebar, genuine request turn label, and reload. The browser
+proof uses synthetic data only (output/session-title-deep-link.png, ignored).

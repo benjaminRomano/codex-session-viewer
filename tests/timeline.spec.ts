@@ -234,7 +234,7 @@ test('flow visibility, linked navigation, agent scope, and turn filtering', asyn
   await expect(page.getByTestId('timeline-canvas')).toHaveAttribute('data-agent-count', '4');
   await page.locator('.turn-row').filter({ hasText: 'Run a final smoke test' }).click();
   await expect(page.getByTestId('timeline-canvas')).toHaveAttribute('data-agent-count', '1');
-  expect(await windowDuration(page)).toBe(8000);
+  await expect.poll(() => windowDuration(page)).toBe(8000);
   await page.getByRole('button', { name: 'Whole session', exact: false }).click();
   await page
     .locator('.details-tabs')

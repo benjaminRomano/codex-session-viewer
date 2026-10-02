@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { PARSER_VERSION } from '../src/lib/parser-pool';
 import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -348,7 +349,7 @@ test('session info reports identities and diagnostics; C toggles only outside di
   await page.getByRole('button', { name: 'Session info', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Session info' });
   await expect(dialog.getByLabel('Session ID', { exact: true })).toHaveValue(rootId);
-  await expect(dialog).toContainText('session-parser-v1-stream-9');
+  await expect(dialog).toContainText(PARSER_VERSION);
   await expect(dialog).toContainText('sessions/demo-root.jsonl');
   await dialog.getByRole('button', { name: 'Copy session ID' }).click();
   await expect(dialog.getByRole('status')).toHaveText('Session ID copied');

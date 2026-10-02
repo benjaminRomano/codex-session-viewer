@@ -651,3 +651,13 @@ production build and native/WASM parity passed. All three external Chrome
 deep-link tests passed, including a synthetic injected page-context record, saved
 index title in header/sidebar, genuine request turn label, and reload. The browser
 proof uses synthetic data only (output/session-title-deep-link.png, ignored).
+
+The first publication attempt was correctly blocked: the full Chrome suite had a
+hardcoded old parser version in its session-info assertion. The focused deep-link
+suite missed that dependency. The assertion now reads PARSER_VERSION, so intentional
+cache invalidations remain covered without stale version literals.
+
+The full local browser rerun also exposed an existing asynchronous ruler assertion:
+agent-count rendering could finish before the viewport duration updated. The test
+now waits for the exact expected duration with expect.poll, retaining the same
+8-second requirement rather than accepting an intermediate whole-session range.
